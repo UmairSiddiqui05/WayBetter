@@ -35,6 +35,11 @@ Every external dependency sits behind a provider interface (`DrivingProvider`, `
 | [DECISIONS.md](DECISIONS.md) | Locked decisions with rationale | tempted to relitigate a choice |
 | [PLAN-REVIEW-LOG.md](PLAN-REVIEW-LOG.md) | Full transcript of the adversarial plan review | curious how the plan was hardened |
 | [CLAUDE.md](CLAUDE.md) | Standing instructions for AI coding agents | an AI agent, before touching anything |
+| [docs/agent-tasks.md](docs/agent-tasks.md) | Work orders A1–A10 with definitions of done and dependency order | an agent being dispatched to build something |
+| [docs/api-spec.yaml](docs/api-spec.yaml) | Contract-first OpenAPI spec — **the API contract** until FastAPI generates the authoritative one | building the backend or a client |
+| [docs/verification.md](docs/verification.md) | Golden-trip fixtures (G-01…G-10), edge/failure fixtures (E-01…E-12), human QA script + launch gate | writing tests or verifying results |
+| [.env.example](.env.example) | Template of every environment variable / API key (placeholders only) | setting up a dev environment |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI: lint/type/test for backend and web (skip until code exists), OpenAPI lint + secret guard (active now) | wondering what gates a push |
 
 ## Project intent
 

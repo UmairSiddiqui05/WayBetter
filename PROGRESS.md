@@ -4,7 +4,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Protocol (agents: follow exactly)
 
-1. Before working: read this file, [CLAUDE.md](CLAUDE.md), and the relevant [PLAN.md](PLAN.md) section.
+1. Before working: read this file, [CLAUDE.md](CLAUDE.md), your brief in [docs/agent-tasks.md](docs/agent-tasks.md), and the relevant [PLAN.md](PLAN.md) section.
 2. Claim work by moving an item to **In progress** with your agent role + date.
 3. When done: move it to the checklist as `[x]`, and append a dated entry to the **Work log** (what changed, files touched, requirement IDs, anything the next agent must know — especially surprises and deviations).
 4. Never delete log entries. Never mark something done that isn't verified (tests passing ≠ verified; see CLAUDE.md verification rules).

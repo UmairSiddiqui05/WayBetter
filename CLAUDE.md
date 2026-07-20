@@ -5,16 +5,19 @@ You are building **WayBetter**, the park-and-ride trip planner. Read this file f
 ## Document precedence (conflicts resolve top-down)
 
 1. **[PLAN.md](PLAN.md)** — approved implementation plan. Authoritative for the launch build, including its PRD amendments section.
-2. **[REQUIREMENTS.md](REQUIREMENTS.md)** — numbered launch requirements. Cite IDs (F-xx/N-xx) in commits and tests.
-3. **[DECISIONS.md](DECISIONS.md)** — locked decisions. Do not relitigate; raise evidence to the human instead.
-4. **[multimodal_park_and_ride_prd.md](multimodal_park_and_ride_prd.md)** — long-term product vision. Context, not launch spec.
+2. **[docs/api-spec.yaml](docs/api-spec.yaml)** — the API contract until FastAPI generates the authoritative spec. Pydantic models and the generated TS client mirror it exactly; changing it requires a version bump in the file + a PROGRESS.md log entry.
+3. **[REQUIREMENTS.md](REQUIREMENTS.md)** — numbered launch requirements. Cite IDs (F-xx/N-xx) in commits and tests.
+4. **[DECISIONS.md](DECISIONS.md)** — locked decisions. Do not relitigate; raise evidence to the human instead.
+5. **[multimodal_park_and_ride_prd.md](multimodal_park_and_ride_prd.md)** — long-term product vision. Context, not launch spec.
+
+Your specific assignment lives in **[docs/agent-tasks.md](docs/agent-tasks.md)** (briefs A1–A10 with definitions of done); test fixtures you must satisfy live in **[docs/verification.md](docs/verification.md)**.
 
 ## Workflow (non-negotiable)
 
-- **Before work:** read [PROGRESS.md](PROGRESS.md); claim your item there.
+- **Before work:** read [PROGRESS.md](PROGRESS.md) and your brief in [docs/agent-tasks.md](docs/agent-tasks.md); claim your item in PROGRESS.md.
 - **After work:** update PROGRESS.md (checklist + append-only work log entry: date, role, what changed, files, requirement IDs, surprises). Work that isn't logged didn't happen.
 - **Scope discipline:** new work discovered mid-task → PROGRESS.md backlog, not silent scope growth. Material deviation from PLAN.md → stop, write it up, ask the human.
-- **Verification:** "done" means exercised end-to-end, not "compiles" or "tests pass." Routing outputs need a sanity-checked real itinerary (e.g., Princeton Jct → NYU arrive-by 9am returns plausible NEC trips). Anything touching parking prices, fares, or tolls needs a human spot-check before it's marked done.
+- **Verification:** "done" means exercised end-to-end, not "compiles" or "tests pass" — your brief's definition of done in docs/agent-tasks.md cites the [docs/verification.md](docs/verification.md) fixtures (G-xx/E-xx) that must hold. Anything touching parking prices, fares, or tolls needs a human spot-check before it's marked done.
 - **Commits:** small, scoped, message references requirement IDs (e.g., `F-04: candidate generator isochrone query`).
 
 ## Hard architecture rules
