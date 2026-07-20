@@ -70,4 +70,6 @@ _(nothing — build not started)_
 
 ## Work log (append-only, newest first)
 
+- **2026-07-19 — Claude (planning):** Pre-build tooling added: `.env.example` (env template, no hardcoded keys), `docs/api-spec.yaml` (contract-first OpenAPI v0.1 — the API contract until FastAPI generates the real one), `docs/agent-tasks.md` (per-agent work orders A1–A10 with definitions of done), `docs/verification.md` (G/E fixtures + human QA script and launch gate), `.github/workflows/ci.yml` (backend/web jobs skip gracefully until code exists; OpenAPI lint + secret-pattern guard active now). Repo pushed to https://github.com/UmairSiddiqui05/WayBetter. Build not started.
+
 - **2026-07-19 — Claude (planning):** PLAN.md approved after 6-round adversarial Codex review (31/31 findings accepted; see PLAN-REVIEW-LOG.md). Created README.md, REQUIREMENTS.md, PROGRESS.md, DECISIONS.md, CLAUDE.md. No code written. Next: Phase 0 scaffold.

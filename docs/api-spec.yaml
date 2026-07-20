@@ -1,0 +1,387 @@
+# WayBetter API — contract-first stub (v0.1)
+# Purpose: lock the JSON shapes so backend and web agents can build in parallel.
+# FastAPI will generate the authoritative spec later; until then, THIS FILE is the
+# contract. Changes require a PROGRESS.md log entry and a version bump here.
+# Rules baked in: display-ready JSON (N-01), provenance on user-facing data (N-02),
+# no client-supplied user identity (N-06), server-issued anonymous sessions (N-05).
+
+openapi: 3.1.0
+info:
+  title: WayBetter API
+  version: 0.1.0
+  description: >
+    Park-and-ride decision engine. All routing, scoring, labeling, and explanation
+    logic is server-side; clients render these payloads without recomputation.
+
+servers:
+  - url: /api/v1
+
+# Default: public (rate-limited by IP). Operations that write or spend provider
+# budget additionally require the anonymous session token.
+security: []
+
+paths:
+  /session:
+    post:
+      summary: Issue an anonymous session token (rate-limiting + feedback attribution)
+      responses:
+        "201":
+          description: New anonymous session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_token]
+                properties:
+                  session_token: { type: string }
+
+  /trip/search:
+    post:
+      summary: Compare full-drive, full-transit, and park-and-ride itineraries
+      security: [{ sessionToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TripSearchRequest" }
+      responses:
+        "200":
+          description: Ranked route options
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripSearchResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "422":
+          description: Request outside region bounds or caps (rejected before provider calls, N-05)
+        "429": { description: Rate limited }
+
+  /trip/ai-parse:
+    post:
+      summary: Parse a natural-language trip request into a structured draft TripSearchRequest
+      security: [{ sessionToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: >
+            Draft request + list of missing critical fields the client must collect
+            before calling /trip/search. The LLM only fills schema fields; it never
+            invents stations, prices, or schedules (F-08).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft, missing_fields]
+                properties:
+                  draft: { $ref: "#/components/schemas/TripSearchRequest" }
+                  missing_fields:
+                    type: array
+                    items: { type: string }
+                  clarifying_question:
+                    type: [string, "null"]
+
+  /trip/{request_id}:
+    get:
+      summary: Re-fetch a previously computed search result
+      parameters:
+        - { name: request_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Same shape as /trip/search response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripSearchResponse" }
+        "404": { description: Unknown or expired request_id }
+
+  /stations/search:
+    get:
+      summary: Search stations (name/geo)
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: radius_m, in: query, schema: { type: integer, maximum: 30000 } }
+      responses:
+        "200":
+          description: Matching stations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Station" }
+
+  /stations/{station_id}:
+    get:
+      summary: Station detail (canonical ID, not raw GTFS ID — N-03)
+      parameters:
+        - { name: station_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Station detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Station" }
+        "404": { description: Unknown station }
+
+  /parking/{station_id}:
+    get:
+      summary: Parking facilities for a station
+      parameters:
+        - { name: station_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Parking facilities with provenance and verification metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ParkingFacility" }
+
+  /feedback/parking:
+    post:
+      summary: Anonymous parking report (rate-limited, sanitized — F-15)
+      security: [{ sessionToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parking_id, outcome, observed_at]
+              properties:
+                parking_id: { type: string }
+                outcome: { type: string, enum: [found_spot, lot_full, lot_closed, price_wrong, other] }
+                observed_at: { type: string, format: date-time }
+                note: { type: string, maxLength: 280 }
+      responses:
+        "202": { description: Accepted }
+        "429": { description: Rate limited }
+
+  /providers/status:
+    get:
+      summary: Health of upstream providers (OTP, driving, geocoding, LLM, alert feeds)
+      responses:
+        "200":
+          description: Per-provider health map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  enum: [ok, degraded, down]
+
+components:
+  securitySchemes:
+    sessionToken:
+      type: apiKey
+      in: header
+      name: X-Session-Token
+
+  responses:
+    ValidationError:
+      description: Request failed schema validation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items: { type: object }
+
+  schemas:
+    Provenance:
+      type: string
+      description: Data-source status shown to users (N-02)
+      enum: [live, scheduled, estimated, unknown, user_reported, ai_generated]
+
+    LatLng:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+        label: { type: string }
+
+    VehicleProfile:
+      type: object
+      properties:
+        type: { type: string, enum: [compact, sedan, suv, hybrid, ev, custom] }
+        mpg: { type: [number, "null"] }
+        kwh_per_mile: { type: [number, "null"] }
+        fuel_price_per_gallon: { type: [number, "null"] }
+        electricity_price_per_kwh: { type: [number, "null"] }
+        toll_payment: { type: string, enum: [ezpass, cash], default: ezpass }
+
+    TripSearchRequest:
+      type: object
+      required: [origin, destination, time_mode]
+      properties:
+        origin: { $ref: "#/components/schemas/LatLng" }
+        destination: { $ref: "#/components/schemas/LatLng" }
+        time_mode: { type: string, enum: [leave_now, leave_at, arrive_by] }
+        target_time:
+          type: [string, "null"]
+          format: date-time
+          description: Required unless leave_now. Timezone-aware (region config timezone).
+        allowed_modes:
+          type: array
+          items: { type: string, enum: [car, transit, walk] }
+          description: bike/scooter arrive with the GBFS fast-follow (F-20)
+        preferences:
+          type: object
+          properties:
+            sort_mode:
+              type: string
+              enum: [best_overall, fastest, cheapest, least_driving, most_driving, fewest_transfers, best_parking]
+            avoid_tolls: { type: boolean, default: false }
+            avoid_city_driving: { type: boolean, default: false }
+            max_walk_minutes: { type: [integer, "null"] }
+            max_transfers: { type: [integer, "null"] }
+            cost_sensitivity: { type: string, enum: [low, medium, high] }
+            driving_penalty: { type: string, enum: [low, medium, high] }
+        vehicle_profile: { $ref: "#/components/schemas/VehicleProfile" }
+        # NOTE: no user_id field. Identity is server-side only until auth exists (N-06).
+
+    CostBreakdown:
+      type: object
+      required: [total, currency]
+      properties:
+        currency: { type: string, default: USD }
+        gas_or_ev: { $ref: "#/components/schemas/MoneyEstimate" }
+        parking: { $ref: "#/components/schemas/MoneyEstimate" }
+        transit_fare: { $ref: "#/components/schemas/MoneyEstimate" }
+        tolls: { $ref: "#/components/schemas/MoneyEstimate" }
+        congestion_fee: { $ref: "#/components/schemas/MoneyEstimate" }
+        total: { type: number }
+
+    MoneyEstimate:
+      type: object
+      required: [amount, provenance]
+      properties:
+        amount: { type: [number, "null"] }
+        provenance: { $ref: "#/components/schemas/Provenance" }
+        note: { type: [string, "null"] }
+
+    RouteLeg:
+      type: object
+      required: [leg_id, mode, start_time, end_time, duration_minutes]
+      properties:
+        leg_id: { type: string }
+        mode: { type: string, enum: [car, transit, walk] }
+        start_location: { $ref: "#/components/schemas/LatLng" }
+        end_location: { $ref: "#/components/schemas/LatLng" }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        duration_minutes: { type: number }
+        distance_miles: { type: [number, "null"] }
+        agency: { type: [string, "null"] }
+        route_name: { type: [string, "null"] }
+        headsign: { type: [string, "null"] }
+        polyline: { type: [string, "null"], description: Encoded polyline for map display }
+        time_provenance: { $ref: "#/components/schemas/Provenance" }
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/Alert" }
+
+    Alert:
+      type: object
+      required: [agency, summary, provenance]
+      properties:
+        agency: { type: string }
+        summary: { type: string, description: 'Sanitized plain text, truncated for lists (F-11)' }
+        full_text: { type: [string, "null"], description: 'Sanitized plain text, never HTML' }
+        provenance: { $ref: "#/components/schemas/Provenance" }
+
+    RouteOption:
+      type: object
+      required: [route_id, summary, total_minutes, cost_breakdown, legs]
+      properties:
+        route_id: { type: string }
+        label: { type: [string, "null"], description: 'Server-assigned badge, e.g. "Cheapest" (N-01)' }
+        summary: { type: string }
+        total_minutes: { type: number }
+        drive_minutes: { type: number }
+        transit_minutes: { type: number }
+        walk_minutes: { type: number }
+        wait_minutes: { type: number }
+        drive_miles: { type: number }
+        transfer_count: { type: integer }
+        cost_breakdown: { $ref: "#/components/schemas/CostBreakdown" }
+        emissions_kg: { $ref: "#/components/schemas/MoneyEstimate" }
+        parking:
+          type: [object, "null"]
+          properties:
+            facility: { $ref: "#/components/schemas/ParkingFacility" }
+            confidence: { type: string, enum: [high, medium, low, unknown] }
+        reliability: { type: string, enum: [high, medium, low] }
+        warnings:
+          type: array
+          items: { type: string }
+        explanation:
+          type: object
+          properties:
+            text: { type: string }
+            provenance: { $ref: "#/components/schemas/Provenance" }
+        legs:
+          type: array
+          items: { $ref: "#/components/schemas/RouteLeg" }
+
+    TripSearchResponse:
+      type: object
+      required: [request_id, routes, sort_options, disclaimers]
+      properties:
+        request_id: { type: string }
+        routes:
+          type: array
+          items: { $ref: "#/components/schemas/RouteOption" }
+        sort_options:
+          type: array
+          items: { type: string }
+        disclaimers:
+          type: array
+          items: { type: string }
+          description: Required user-facing disclaimers (PRD §20), server-supplied
+
+    Station:
+      type: object
+      required: [station_id, name, location]
+      properties:
+        station_id: { type: string, description: Canonical WayBetter ID (N-03) }
+        name: { type: string }
+        agency: { type: string }
+        location: { $ref: "#/components/schemas/LatLng" }
+        modes:
+          type: array
+          items: { type: string }
+        has_parking_data: { type: boolean }
+
+    ParkingFacility:
+      type: object
+      required: [parking_id, name, location, provenance]
+      properties:
+        parking_id: { type: string }
+        station_id: { type: string }
+        name: { type: string }
+        location: { $ref: "#/components/schemas/LatLng" }
+        type: { type: string, enum: [park_and_ride, garage, lot, street] }
+        capacity: { type: [integer, "null"] }
+        price_daily: { $ref: "#/components/schemas/MoneyEstimate" }
+        price_hourly: { $ref: "#/components/schemas/MoneyEstimate" }
+        payment_methods:
+          type: array
+          items: { type: string }
+        permit_required: { type: [boolean, "null"] }
+        overnight_allowed: { type: [boolean, "null"] }
+        restrictions: { type: [string, "null"] }
+        provenance: { $ref: "#/components/schemas/Provenance" }
+        source_url: { type: [string, "null"] }
+        last_verified_at: { type: [string, "null"], format: date }

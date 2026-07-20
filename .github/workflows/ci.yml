@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect backend
+        id: detect
+        run: |
+          if [ -f backend/pyproject.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No backend/pyproject.toml yet — skipping (pre-build phase)."
+          fi
+
+      - name: Set up Python
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        if: steps.detect.outputs.present == 'true'
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        if: steps.detect.outputs.present == 'true'
+        working-directory: backend
+        run: ruff check . && ruff format --check .
+
+      - name: Type check (mypy)
+        if: steps.detect.outputs.present == 'true'
+        working-directory: backend
+        run: mypy app || true  # advisory until Phase 1 completes, then remove '|| true'
+
+      - name: Tests (pytest)
+        if: steps.detect.outputs.present == 'true'
+        working-directory: backend
+        env:
+          ENVIRONMENT: test
+        run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect web
+        id: detect
+        run: |
+          if [ -f web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No web/package.json yet — skipping (pre-build phase)."
+          fi
+
+      - name: Set up Node
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        if: steps.detect.outputs.present == 'true'
+        working-directory: web
+        run: npm ci
+
+      - name: Lint
+        if: steps.detect.outputs.present == 'true'
+        working-directory: web
+        run: npm run lint --if-present
+
+      - name: Build
+        if: steps.detect.outputs.present == 'true'
+        working-directory: web
+        run: npm run build --if-present
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate OpenAPI contract
+        run: |
+          npx --yes @redocly/cli@latest lint docs/api-spec.yaml
+
+      - name: Guard against secrets in tracked files
+        run: |
+          if grep -rInE "(sk-[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{30,}|gho_[A-Za-z0-9]{20,})" --exclude-dir=.git .; then
+            echo "Potential secret committed"; exit 1
+          fi
+          echo "No secret patterns found."
