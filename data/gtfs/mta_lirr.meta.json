@@ -1,0 +1,20 @@
+{
+  "feed_id": "mta_lirr",
+  "agency_name": "Long Island Rail Road",
+  "source_url": "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip",
+  "retrieved_at": "2026-08-04T04:31:14.220867+00:00",
+  "sha256": "c87e80be01747f07a25b32c8ed53da1517d91a10deebc85244017e2377c05af4",
+  "size_bytes": 1847463,
+  "feed_version": "GO201_26",
+  "license_name": "MTA Developer Terms of Use",
+  "license_url": "https://www.mta.info/developers",
+  "license_verified": false,
+  "attribution": "Data provided by the Metropolitan Transportation Authority",
+  "agency_ids": [
+    "LI"
+  ],
+  "validation_errors": [],
+  "validation_warnings": [
+    "no calendar.txt \u2014 service comes entirely from calendar_dates.txt (normal for LIRR/Metro-North; holiday and weekend fixtures depend on it)"
+  ]
+}

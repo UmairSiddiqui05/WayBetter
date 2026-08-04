@@ -1,0 +1,21 @@
+{
+  "feed_id": "mta_mnr",
+  "agency_name": "Metro-North Railroad",
+  "source_url": "https://rrgtfsfeeds.s3.amazonaws.com/gtfsmnr.zip",
+  "retrieved_at": "2026-08-04T04:31:14.859708+00:00",
+  "sha256": "7abd96ef702c1100b595bba9adef0f1036bcc04ce82e6a5cc9d22332a59b195f",
+  "size_bytes": 3683062,
+  "feed_version": "sha256:7abd96ef702c1100",
+  "license_name": "MTA Developer Terms of Use",
+  "license_url": "https://www.mta.info/developers",
+  "license_verified": false,
+  "attribution": "Data provided by the Metropolitan Transportation Authority",
+  "agency_ids": [
+    "1"
+  ],
+  "validation_errors": [],
+  "validation_warnings": [
+    "no calendar.txt \u2014 service comes entirely from calendar_dates.txt (normal for LIRR/Metro-North; holiday and weekend fixtures depend on it)",
+    "no feed_info.txt \u2014 feed publishes no feed_version; falling back to a content hash"
+  ]
+}
