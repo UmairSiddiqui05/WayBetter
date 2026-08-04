@@ -88,6 +88,23 @@ The single source of truth for **what is done, what is in progress, and what com
 - Advanced sort/filter drawer (remaining PRD modes)
 - Accounts (Sign in with Apple / magic link) when sync earns it
 
+## Blockers needing a human (2026-08-04)
+
+- **B-1 — This session cannot push. A1's commits exist only as patch files.**
+  `git push` returns `403` on `git-receive-pack`, and the GitHub API returns
+  `403 Resource not accessible by integration` for branch creation, so the agent could
+  neither push `agent/a1-scaffold` nor open the PR the run asked for. Reads work fine
+  (`git fetch` succeeds); the integration is read-only. Fix: grant the Claude GitHub App
+  write access to `UmairSiddiqui05/WayBetter` (Claude GitHub settings), then apply the
+  patches the run handed over — `git am` the four-commit series, or fetch from the bundle,
+  and push `agent/a1-scaffold`. **Nothing is lost as long as those patch files are saved:
+  the container is ephemeral and its local commits go away with it.**
+- **B-2 — No container image can be pulled here.** Egress policy answers 403 for
+  `production.cloudfront.docker.com`. Blocks the last A1 checkbox (below) and will block
+  A2's OTP graph build.
+- **B-3 — NJ Transit developer portal.** Needs an account and terms acceptance; this run is
+  not permitted to create accounts or accept terms. Human task, unchanged from Phase 0.
+
 ## Open questions for human review
 
 1. **Docker Hub egress (blocker for the last A1 checkbox).** The agent sandbox's egress policy
