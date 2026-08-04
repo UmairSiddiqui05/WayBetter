@@ -1,0 +1,90 @@
+# WayBetter local stack.
+#
+#   cp .env.example .env && make up
+#
+# Brings up: FastAPI (api) + PostgreSQL/PostGIS (db) + Redis (redis).
+# OTP sits behind the `otp` profile because it cannot start without a graph
+# bundle, and graph bundles are built off-box by A2 (PLAN §2, N-08). Start it
+# with `make up-otp` once data/otp-graphs/ holds a bundle.
+#
+# Secrets: every value comes from .env (gitignored). Nothing here hardcodes a
+# credential beyond the local-only Postgres defaults, which are overridable.
+
+name: waybetter
+
+services:
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    env_file: [.env]
+    environment:
+      # Compose service names override the localhost defaults in .env.example.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-waybetter}:${POSTGRES_PASSWORD:-waybetter}@db:5432/${POSTGRES_DB:-waybetter}
+      REDIS_URL: redis://redis:6379/0
+      OTP_BASE_URL: http://otp:8080
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-waybetter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waybetter}
+      POSTGRES_DB: ${POSTGRES_DB:-waybetter}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waybetter} -d ${POSTGRES_DB:-waybetter}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  otp:
+    profiles: ["otp"]
+    image: opentripplanner/opentripplanner:2.5.0
+    # Serves a prebuilt graph; it never builds one here (builds are off-box, N-08).
+    command: ["--load", "--serve", "/var/opentripplanner"]
+    volumes:
+      - ./data/otp-graphs/current:/var/opentripplanner:ro
+    ports:
+      - "${OTP_PORT:-8080}:8080"
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx${OTP_MAX_HEAP:-8G}"
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuators/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

@@ -13,6 +13,10 @@
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
 
 # Node
 node_modules/
@@ -21,7 +25,8 @@ node_modules/
 # Data artifacts (feeds, graphs — fetched by scripts, not committed)
 data/gtfs/*.zip
 data/osm/*.pbf
-data/otp-graphs/
+data/otp-graphs/*
+!data/otp-graphs/.gitkeep
 
 # iOS
 ios/**/xcuserdata/
