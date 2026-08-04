@@ -118,3 +118,21 @@ openapi: install ## Print the generated OpenAPI document
 .PHONY: contract-lint
 contract-lint: ## Lint the API contract the way CI does
 	npx --yes @redocly/cli@latest lint docs/api-spec.yaml
+
+# --- Data ingestion ----------------------------------------------------------
+
+.PHONY: check-region
+check-region: install ## Validate the region config and report missing data
+	$(VENV_BIN)/waybetter-ingest check-region
+
+.PHONY: fetch-feeds
+fetch-feeds: install ## Download + validate enabled GTFS feeds, record provenance
+	$(VENV_BIN)/waybetter-ingest fetch
+
+.PHONY: station-map
+station-map: install ## Rebuild the canonical station mapping table from downloaded feeds
+	$(VENV_BIN)/waybetter-ingest build-station-map
+
+.PHONY: osm-plan
+osm-plan: install ## Print the OSM extract pipeline (bbox derived from region config)
+	$(VENV_BIN)/waybetter-ingest osm-plan

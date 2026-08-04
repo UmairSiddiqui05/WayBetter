@@ -1,0 +1,168 @@
+# NYC metro region configuration.
+#
+# Regions are data, not code (N-03, D-08). Nothing here is a fare, a toll, or a
+# price — those live in effective-dated files under the directories named in
+# `data_files` (F-12, F-13). This file only says what the region *is* and where
+# its data lives.
+#
+# Every feed carries a licence block with `verified: false` until a human has
+# read the agency's terms and confirmed they permit this use (N-09). The build
+# agent could not reach any agency developer page (egress policy denies
+# everything except the MTA feed bucket), so it asserted nothing about terms.
+
+region_id: nyc-metro
+name: New York Metropolitan Area
+timezone: America/New_York
+
+# Request-validation boundary: origins/destinations outside this box are rejected
+# before any paid provider call (N-05, fixture E-04).
+#
+# Corners are driven by the launch corridors in PLAN §3:
+#   south-west  Trenton, NJ (40.22, -74.77) — NEC southern terminus
+#   north       Springfield, MA (42.10, -72.59) — Hartford Line northern end
+#   north-west  Port Jervis, NY (41.37, -74.69)
+#   east        Montauk, NY (41.04, -71.95) and New London, CT (41.36, -72.10)
+#
+# `min_lat: 40.00` is deliberately tight enough to exclude Philadelphia (39.95),
+# which a looser south-west corner would swallow — an out-of-region metro inside
+# the box means real provider spend on trips this app cannot plan. The
+# consequence: **NJ Transit's Atlantic City line and River Line are outside the
+# region.** That is judged correct for a NYC park-and-ride app, but it is a
+# product call, not a fact.
+#
+# HUMAN CHECK: derived from corridor endpoints, not from a published service-area
+# polygon. Too tight silently rejects real trips; too loose spends provider
+# budget on nonsense. Confirm before launch.
+bounding_box:
+  min_lat: 40.00
+  min_lng: -75.20
+  max_lat: 42.15
+  max_lng: -71.80
+
+# Park, walk to the platform, and be on it before the doors close. Used by the
+# arrive-by backward solve (F-05); per-station overrides belong in parking data.
+default_parking_buffer_minutes: 7
+
+feeds:
+  - feed_id: mta_subway
+    agency_name: MTA New York City Transit
+    agency_ids: ["MTA NYCT"]
+    modes: [subway]
+    format: gtfs
+    url: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+    license:
+      name: MTA Developer Terms of Use
+      url: https://www.mta.info/developers
+      attribution: Data provided by the Metropolitan Transportation Authority
+      verified: false
+      notes: >
+        Feed downloads and parses. The terms page itself was unreachable from the
+        build environment, so no claim is made about what the licence permits.
+        A human must read it and set verified: true before launch.
+
+  - feed_id: mta_lirr
+    agency_name: Long Island Rail Road
+    agency_ids: ["LI"]
+    modes: [commuter_rail]
+    format: gtfs
+    url: https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip
+    license:
+      name: MTA Developer Terms of Use
+      url: https://www.mta.info/developers
+      attribution: Data provided by the Metropolitan Transportation Authority
+      verified: false
+
+  - feed_id: mta_mnr
+    agency_name: Metro-North Railroad
+    agency_ids: ["1"]
+    modes: [commuter_rail]
+    format: gtfs
+    url: https://rrgtfsfeeds.s3.amazonaws.com/gtfsmnr.zip
+    license:
+      name: MTA Developer Terms of Use
+      url: https://www.mta.info/developers
+      attribution: Data provided by the Metropolitan Transportation Authority
+      verified: false
+      notes: >
+        This feed ships no feed_info.txt, so it has no publisher-declared
+        feed_version. Ingestion falls back to a content hash — see
+        app/ingestion/gtfs.py.
+
+  - feed_id: path
+    agency_name: Port Authority Trans-Hudson
+    modes: [rapid_transit]
+    format: gtfs
+    enabled: false
+    blocked_reason: >
+      Egress policy in the build environment denied both panynj.gov and the
+      Trillium mirror, so no PATH feed URL could be confirmed. Launch scope needs
+      it (PLAN §3). Confirm the current URL from the PANYNJ developer resources
+      page, set it here, and enable.
+    license:
+      name: UNCONFIRMED
+      url: https://www.panynj.gov/path/en/developer-resources.html
+      verified: false
+
+  - feed_id: ct_rail
+    agency_name: CTrail (Shore Line East / Hartford Line)
+    modes: [commuter_rail]
+    format: gtfs
+    enabled: false
+    blocked_reason: >
+      cttransit.com was unreachable from the build environment; feed URL
+      unconfirmed. Launch scope (PLAN §3).
+    license:
+      name: UNCONFIRMED
+      url: https://www.cttransit.com/about/developers
+      verified: false
+
+  - feed_id: njt_rail
+    agency_name: NJ Transit Rail
+    modes: [commuter_rail]
+    format: gtfs
+    enabled: false
+    requires_credentials: true
+    credential_env: [NJT_DEVELOPER_USERNAME, NJT_DEVELOPER_PASSWORD]
+    blocked_reason: >
+      NJ Transit requires developer-portal registration and terms acceptance.
+      Creating accounts and accepting terms is a human task and was explicitly
+      out of scope for the agent run (PLAN risk item, PROGRESS blocker B-3).
+    license:
+      name: NJ TRANSIT Developer Portal Terms
+      url: https://www.njtransit.com/developer-resources
+      verified: false
+
+  - feed_id: njt_bus
+    agency_name: NJ Transit Bus (commuter)
+    modes: [bus]
+    format: gtfs
+    enabled: false
+    requires_credentials: true
+    credential_env: [NJT_DEVELOPER_USERNAME, NJT_DEVELOPER_PASSWORD]
+    blocked_reason: Same NJ Transit portal registration blocker as njt_rail.
+    license:
+      name: NJ TRANSIT Developer Portal Terms
+      url: https://www.njtransit.com/developer-resources
+      verified: false
+
+# "Avoid city driving" is a polygon test on driving legs, not a vibe (F-07).
+# The polygons are GeoJSON files; PostGIS does the intersection.
+city_driving_zones:
+  - zone_id: manhattan
+    name: Manhattan
+    geojson_path: data/regions/zones/manhattan.geojson
+  - zone_id: downtown-newark
+    name: Downtown Newark
+    geojson_path: data/regions/zones/downtown-newark.geojson
+  - zone_id: downtown-jersey-city
+    name: Downtown Jersey City
+    geojson_path: data/regions/zones/downtown-jersey-city.geojson
+
+data_files:
+  fares_dir: data/fares
+  tolls_dir: data/tolls
+  parking_dir: data/parking
+
+graph_bundle:
+  version: null
+  path: data/otp-graphs/current

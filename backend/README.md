@@ -16,12 +16,25 @@ app/
   db/session.py      async SQLAlchemy engine/session; `Base` for A3/A5 models
   cache/client.py    Redis client (cache + rate-limit store)
   health/probes.py   Postgres/PostGIS, Redis, OTP infra probes
-tests/               pytest suite (contract parity, health, settings)
+  regions/           region config schema + loader (regions are data, N-03)
+  ingestion/         GTFS download, validation, canonical station IDs; `cli.py`
+tests/               pytest suite
 ```
 
 Directories that later agents own — `providers/` (N-04 interfaces + adapters,
-A4/A7), `regions/` (region config loader, A2), `scoring/` (A6) — are created by
-those briefs, not pre-stubbed here.
+A4/A7) and `scoring/` (A6) — are created by those briefs, not pre-stubbed here.
+
+## Ingestion CLI
+
+Installed as `waybetter-ingest` (also `make check-region`, `fetch-feeds`,
+`station-map`, `osm-plan`):
+
+| Command | Does |
+|---|---|
+| `check-region` | Validates the region config and reports every missing zone polygon, missing data directory, and unverified feed licence. |
+| `fetch` | Downloads enabled feeds, validates them structurally, and writes a committed `data/gtfs/<feed>.meta.json` provenance record (source URL, licence, retrieved-at, SHA-256, feed version). Re-runs report "unchanged" rather than rewriting. |
+| `build-station-map` | Assigns canonical station IDs and writes `data/regions/<region>-stations.csv`. Deterministic — rebuilding is a no-op diff. |
+| `osm-plan` | Prints the OSM extract pipeline with the clip box derived from the region config. Prints rather than runs; the commands are unverified. |
 
 ## Endpoints in this scaffold
 

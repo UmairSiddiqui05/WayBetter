@@ -14,6 +14,12 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## In progress
 
+- **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
+  Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
+  exercised against the three real MTA feeds. Still open: PATH + CT rail feed URLs (hosts
+  unreachable here), NJ Transit (B-3), the three city-driving zone polygons, the OSM extract,
+  and the OTP graph build. A2 is **not** done.
+
 - **A1 — Scaffold & Infrastructure** (Claude, 2026-08-04) — code complete, one item unverified.
   **Human action needed:** run `make up` on a machine with Docker Hub access and confirm
   `/readyz` reports every required component `ok`. The agent environment's egress policy
@@ -24,12 +30,12 @@ The single source of truth for **what is done, what is in progress, and what com
 ## Phase 0 — Repo + data foundations
 - [x] Repo scaffold per PLAN §1 / PRD §18 (backend/, web/, ios/, data/, docs/) — `web/` and `ios/` are documented placeholders; their scaffolds belong to A8/A9 (a stub `web/package.json` would turn the CI web job green without proving anything)
 - [ ] Docker Compose: FastAPI skeleton + Postgres/PostGIS + Redis boot locally — **compose/Dockerfile/init SQL written and statically validated; never booted (image pulls blocked). Unverified until a human runs `make up`.**
-- [ ] NJ Transit developer-portal registration; confirm GTFS access + terms (PLAN risk item)
-- [ ] Download + validate all launch GTFS feeds (NJT rail/bus, LIRR, MNR, subway, PATH, CT rail)
-- [ ] OSM extract for NY metro region
-- [ ] First OTP graph build (off-box) + serve locally; sample trip queries verified by human
-- [ ] Region config schema (bounding box, timezone, feed registry, city_driving_zone polygons)
-- [ ] Canonical station ID mapping tables
+- [ ] NJ Transit developer-portal registration; confirm GTFS access + terms (PLAN risk item) — **blocker B-3, human only**
+- [ ] Download + validate all launch GTFS feeds (NJT rail/bus, LIRR, MNR, subway, PATH, CT rail) — **3 of 6 done and verified end-to-end** (subway, LIRR, MNR: downloaded, validated, provenance recorded). PATH + CT rail unreachable from the agent environment; NJT needs the portal account. Tooling handles all six.
+- [ ] OSM extract for NY metro region — **`osm-plan` generates the pipeline from region config; never run** (download.geofabrik.de denied by egress policy)
+- [ ] First OTP graph build (off-box) + serve locally; sample trip queries verified by human — blocked by B-2 (no OTP image) and by the missing OSM extract
+- [x] Region config schema (bounding box, timezone, feed registry, city_driving_zone polygons) — schema, loader, and `data/regions/nyc-metro.yaml` shipped. **Zone polygons themselves are not sourced** (see `data/regions/zones/README.md`); `make check-region` reports them missing.
+- [x] Canonical station ID mapping tables — 737 stations across three feeds in `data/regions/nyc-metro-stations.csv`, keyed `(region, feed_id, agency_id, gtfs_stop_id, feed_version)`. Grows as the remaining feeds land.
 - [ ] Parking seed database: schema + first 10 NJT stations (human-verified)
 
 ## Phase 1 — Routing core
@@ -104,6 +110,15 @@ The single source of truth for **what is done, what is in progress, and what com
   A2's OTP graph build.
 - **B-3 — NJ Transit developer portal.** Needs an account and terms acceptance; this run is
   not permitted to create accounts or accept terms. Human task, unchanged from Phase 0.
+- **B-4 — Agency websites are unreachable from the agent environment.** Egress policy denies
+  `panynj.gov`, `cttransit.com`, `mta.info`, and `download.geofabrik.de`; only the MTA feed
+  bucket (`rrgtfsfeeds.s3.amazonaws.com`) is allowed. Consequences: PATH and CT rail feed URLs
+  are unconfirmed, the OSM extract cannot be built, and **no feed licence could be read**, so
+  every `license.verified` in the region config is `false`. A human with a browser resolves all
+  of these in about ten minutes.
+- **B-5 — City-driving zone polygons are unsourced.** `avoid_city_driving` (F-07) and fixture
+  G-07 cannot work until `data/regions/zones/*.geojson` exist. They were left absent rather than
+  approximated; see `data/regions/zones/README.md` for the datasets to fetch.
 
 ## Open questions for human review
 
@@ -134,6 +149,61 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-08-04 — Claude (A2, Data Ingestion — keyless subset):** Branch `agent/a2-ingestion`,
+  built on `agent/a1-scaffold`. Requirement IDs: **N-03, N-08, N-09**. Scope was deliberately
+  limited to work needing no API key, credential, or payment.
+
+  **What changed.** Region config as data (N-03): `app/regions/schema.py` (Pydantic, `extra=forbid`
+  so a typo fails loudly, IANA timezone validated, bounding box ordering enforced, feed registry
+  with a licence block per feed) + `app/regions/loader.py` + `data/regions/nyc-metro.yaml`.
+  Ingestion (`app/ingestion/`): `gtfs.py` (archive reader, structural validation, station
+  extraction, feed versioning), `feeds.py` (downloader writing a committed provenance sidecar),
+  `stations.py` (canonical station IDs), `cli.py` (`waybetter-ingest` with `check-region`,
+  `fetch`, `build-station-map`, `osm-plan`). Makefile targets and 42 new tests.
+
+  **Files:** `backend/app/regions/{__init__,schema,loader}.py`,
+  `backend/app/ingestion/{__init__,gtfs,feeds,stations,cli}.py`,
+  `backend/tests/{test_region_config,test_gtfs_ingestion,test_station_mapping}.py`,
+  `backend/pyproject.toml` (console script), `backend/README.md`, `Makefile`,
+  `data/regions/nyc-metro.yaml`, `data/regions/zones/README.md`,
+  `data/regions/nyc-metro-stations.csv`, `data/gtfs/mta_{subway,lirr,mnr}.meta.json`, `PROGRESS.md`.
+
+  **Verified against real feeds.** MTA subway (496 stations), LIRR (127), Metro-North (114)
+  downloaded, structurally validated, and provenance recorded; re-running reports "unchanged"
+  rather than re-downloading; `build-station-map` produced 737 canonical IDs and rebuilding is a
+  byte-identical diff. ruff, mypy strict, and 63 tests all clean.
+
+  **Surprises — all found by running against real data, none anticipated.**
+  (a) **The canonical-ID design is not theoretical:** LIRR `stop_id=1` is *Albertson* and
+  Metro-North `stop_id=1` is *Grand Central*. Two launch feeds collide on their very first stop
+  ID. There is now a test asserting exactly that pair stays distinct.
+  (b) **LIRR and Metro-North ship no `calendar.txt`** — service is entirely `calendar_dates.txt`.
+  Requiring `calendar.txt` would have rejected two launch feeds, so it is a warning. Fixtures
+  E-01/E-03 (midnight, holiday) depend on reading `calendar_dates` correctly.
+  (c) **Metro-North ships no `feed_info.txt`**, so it publishes no `feed_version`. Ingestion falls
+  back to a content hash. Anything that keys on a publisher version needs to tolerate this.
+  (d) **Subway uses `location_type=1` parent stations; LIRR and MNR are flat.** Station extraction
+  handles both, and drops platforms — you drive to a station, not a track.
+  (e) **The first bounding box I wrote included Philadelphia.** My own test caught it. Corners are
+  now driven by named corridor endpoints and exclude Philadelphia at `min_lat: 40.00`, which also
+  puts NJT's Atlantic City and River lines outside the region — a product call flagged for review,
+  not a fact.
+  (f) LIRR's `feed_info.txt` declares `feed_timezone: "America/New York"` — a space where the IANA
+  name has an underscore, so it is not a loadable zone name. Harmless today (region timezone comes
+  from config, N-03) but it will bite anyone who trusts that field.
+
+  **NOT verified / still open.** PATH and CT rail: `panynj.gov`, the Trillium mirror, and
+  `cttransit.com` are all denied by the build environment's egress policy, so **no feed URL could
+  be confirmed** — both are registered as disabled with the reason recorded, and the config states
+  `license: UNCONFIRMED` rather than guessing. NJ Transit: untouched (blocker B-3). **Every MTA
+  licence is `verified: false`** — `mta.info/developers` was unreachable, so the agent read no
+  terms and asserted nothing about them; a human must confirm and flip the flag (N-09). The three
+  `city_driving_zone` polygons are **not sourced** — deliberately absent rather than approximated,
+  because a hand-drawn Manhattan outline produces confidently wrong `avoid_city_driving` results
+  (G-07); `data/regions/zones/README.md` names the datasets to fetch. `osm-plan` prints an
+  **unverified** pipeline. No OTP graph was built, so the A2 definition of done — OTP answering a
+  Princeton Junction → NY Penn query — is untouched.
 
 - **2026-08-04 — Claude (A1, Scaffold & Infrastructure):** First code in the repo. Branch
   `agent/a1-scaffold`. Requirement IDs: **N-08, N-11** (brief scope), touching **N-01, N-02,
