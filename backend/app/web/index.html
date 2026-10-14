@@ -63,7 +63,8 @@
   select, input[type=datetime-local], input[type=time] { width: 100%; min-width: 0; padding: 8px 10px;
     border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 10px; }
-  .when-row .field { flex: 1 1 190px; }
+  .when-row .field { flex: 1 1 230px; }
+  .when-row .primary { flex: 1 0 auto; }
   .primary { padding: 9px 18px; font-weight: 700; border: 0; border-radius: 8px; background: var(--ink);
     color: #fff; cursor: pointer; }
   .primary:disabled { opacity: .6; cursor: progress; }
@@ -194,7 +195,7 @@
 
   @media (max-width: 860px) {
     main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 42vh auto; height: auto; }
-    #map { height: 42vh; }
+    #map { height: 42vh; order: -1; }
     aside { border-right: 0; overflow: visible; }
     .view { padding: 12px 16px 8px; }
   }
@@ -656,7 +657,7 @@ function openDetail(idx) {
   select(idx);
   $("detail").innerHTML = detailHtml(current[idx]);
   $("detail").hidden = false; $("list").hidden = true; $("results-controls").hidden = true; $("status").hidden = true;
-  $("panel").scrollTop = 0; window.scrollTo({ top: 0 });
+  if (matchMedia("(max-width: 860px)").matches) $("detail").scrollIntoView({ block: "start" }); else $("panel").scrollTop = 0;
   $("detail-back").focus();
 }
 function closeDetail() {
