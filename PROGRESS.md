@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
+  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Follow-up: daily round-trip view (API v0.2.0) added 2026-10-14. Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,27 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT, daily round trip — page, cache, DEMO.md, verification):**
+  Cards now show **one-way vs round trip / day** side by side, a Morning | Home | Day cost table
+  with provenance chips, the trip-home timeline, and Month / Year / savings-vs-driving (all
+  server-supplied; the page only formats, N-01). New "Head home at" input, defaulted from the
+  corridor file via the server-injected presets (`backend/app/web/{index.html,page.py}`); a
+  round-trip disclaimer was added server-side. `app/trips/warm.py` now also fails when an option
+  has no trip home; `make warm-cache` → **36 cached routes** (18 morning + 18 evening), all six
+  preset pairs return 5 options each with a round trip.
+  **Verified:** `make check` green (ruff, mypy strict, **122 tests**); browser on :8000, Princeton →
+  Times Square Thu 10/15 07:00 / home 17:30 matches DEMO.md exactly (Metropark $27.60 one-way,
+  $45.20/day, $773.92/month, saves $1,215.87/month; drive $76.17 / $95.51 / $1,989.79); return
+  19:15 re-plans later trains and the Turnpike goes off-peak (Metropark saves $47.74/day); return
+  06:30 is rejected with a readable error; no console errors; 375 px wide has no horizontal
+  scroll; **network-blocked server (:8001) returns identical numbers** from the cache.
+  DEMO.md: talk track steps 5-6 (daily commute, toll rules), expected-results tables with day /
+  month / savings for all three scenarios, data-source rows, limitations, two new Q&A answers.
+  Requirement IDs: F-12, F-13, F-18, N-01, N-02, N-09.
+  **Backlog:** model monthly garage contracts / lot permits (driving's monthly cost is likely
+  overstated); let the user set commute days per week; consider ranking on the daily total
+  (today it ranks on the morning trip — the order is identical for all presets).
 
 - **2026-10-14 — Claude (DEMO SPRINT, daily round trip — backend + API v0.2.0):** Costs were
   one-way while parking is a full-day charge, so the comparison ignored the trip home. Added a

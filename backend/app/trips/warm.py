@@ -1,4 +1,5 @@
-"""Warm the driving-route cache for every preset origin x destination (demo step 6).
+"""Warm the driving-route cache for every preset origin x destination (demo step 6),
+including each option's evening drive home (daily round-trip view).
 
 Run once with network (`make warm-cache`); afterwards every preset search is served from
 `data/cache/osrm/` and the GTFS file on disk, so the demo works with Wi-Fi off. Routes do
@@ -38,10 +39,13 @@ def main() -> int:
             if best:
                 line += f"; best: {best.summary} ${best.cost_breakdown.total:.2f}"
             print(line)
-            if len(response.routes) < service.option_count:
+            missing_home = [r.summary for r in response.routes if r.round_trip is None]
+            if len(response.routes) < service.option_count or missing_home:
                 failures += 1
                 for note in response.disclaimers:
                     print(f"    ! {note}")
+                for summary in missing_home:
+                    print(f"    ! no trip home: {summary}")
     files = len(list(OSRM_CACHE_DIR.glob("*.json")))
     print(f"\n{files} cached driving routes in {OSRM_CACHE_DIR}")
     return 1 if failures else 0

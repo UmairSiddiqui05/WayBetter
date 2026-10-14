@@ -4,6 +4,8 @@
 WayBetter compares **driving all the way into Manhattan** against **four park-and-ride options on
 NJ TRANSIT's Northeast Corridor**, using real timetables and official toll, fare and parking
 prices. It ranks the options and draws them on a map, and every number shows where it came from.
+It also prices the **whole commute**: the trip home at 5:30 PM, the daily total, and what that
+adds up to per month and per year compared with driving.
 
 ---
 
@@ -27,8 +29,8 @@ demo, which needs neither.
 make install PYTHON=/opt/miniconda3/bin/python3.13   # Python venv + dependencies
 make env                                             # creates .env; put your NJT portal login in it
 make fetch-feeds                                     # downloads MTA + NJ TRANSIT timetables (GTFS)
-make warm-cache                                      # caches the 18 demo driving routes
-make check                                           # ruff + mypy + 101 tests
+make warm-cache                                      # caches the 36 demo driving routes (morning + home)
+make check                                           # ruff + mypy + 122 tests
 ```
 
 ### Morning-of checklist (2 minutes)
@@ -36,12 +38,13 @@ make check                                           # ruff + mypy + 101 tests
 1. Start the server as above and open the page.
 2. Set **Leave at = 10/15/2026, 7:00 AM**. The page defaults to the *next* weekday, which on
    the day itself is Friday 10/16. Friday's results differ by a few minutes, which is fine.
+   Leave **Head home at = 5:30 PM** (the default, read from the corridor data file).
 3. Run Scenario A and confirm the numbers match the table below.
 4. Keep the API docs tab open for the technical questions.
 
 ---
 
-## 2. Demo script (~6 minutes)
+## 2. Demo script (~7 minutes)
 
 **Scenario A: Princeton → Times Square, leave 7:00 AM.** Click **Compare**.
 
@@ -59,42 +62,70 @@ make check                                           # ruff + mypy + 101 tests
 4. Click **Princeton Jct.** *"The 7:38 is an express that reaches Penn at 8:36. The 7:20 local
    leaves earlier but arrives later, so the system picks the train that **arrives first**, not
    the one that leaves first."*
-5. Switch **Rank by → Fastest**, then **Cheapest**. *"Same data, different priorities. The
+5. **The daily commute.** Point at the two numbers on the Metropark card, then its table.
+   *"A one-way number isn't fair, because you pay for parking for the whole day. So the system
+   also plans the trip home: the 6:00 PM train from Penn, back to the car, home by 7:33. In the
+   Day column, the train fare and gas count twice, but parking counts once. A day costs
+   **$45.20** against **$95.51** for driving. That's about **$1,216 a month** and **$14,590 a
+   year**, and monthly uses the NJ TRANSIT pass because it's cheaper than 42 one-way tickets."*
+6. Back on **Drive all the way**, point at the Tolls row. *"Each toll follows its own real rule.
+   The Lincoln Tunnel only charges going *into* New York, so the drive home pays nothing there.
+   The Turnpike charges both ways, and it's the 4:30–6:30 peak at that hour. The congestion
+   toll is charged once a day. These rules come from the agencies' published schedules and
+   live in data files, not in code."*
+   Optional: change **Head home at** to 7:15 PM and Compare. The drive home misses the Turnpike
+   peak, so driving gets a little cheaper and the savings drop to $47.74 a day. *"Time of day
+   changes the answer, and the system knows why."*
+7. Switch **Rank by → Fastest**, then **Cheapest**. *"Same data, different priorities. The
    ranking happens on the server, so a future iPhone app gives identical answers."*
 
 **Scenario B: Lawrenceville → Bryant Park.** *"Lawrenceville is next to Hamilton station, but
 Hamilton isn't the cheapest choice: its fare is $19.75 and parking is $13, against $13.05 and
-$10 at Metropark. The closest station isn't automatically the best one, and that's the insight a
-commuter or a transit agency actually needs."*
+$10 at Metropark. Over a month that's $882 versus $815. The closest station isn't automatically
+the best one, and that's the insight a commuter or a transit agency actually needs."*
 
 **Scenario C (optional): Plainsboro → Times Square.** This route enters the Turnpike at a
 different interchange (8A) and is priced correctly from the same official table.
 
 ---
 
-## 3. Expected results (Thursday 10/15/2026, leave 7:00 AM, E-ZPass)
+## 3. Expected results (Thursday 10/15/2026, leave 7:00 AM, head home 5:30 PM, E-ZPass)
 
 **A. Princeton (Nassau St) → Times Square**
 
-| Option | Train | Door to door | Total |
-|---|---|---|---|
-| ⭐ Park at Metropark *(Best overall · Cheapest)* | 7:59 → 8:38 | 115 min | **$27.60** |
-| Park at Princeton Jct. | 7:38 → 8:36 | 113 min | $32.11 |
-| Park at Hamilton | 7:30 → 8:36 | 113 min | $34.49 |
-| Park at Secaucus | 8:37 → 8:49 | 126 min | $53.04 |
-| Drive all the way *(Fastest)* | — | 82 min | **$76.17** |
+| Option | Morning train | Train home | One-way | Day (round trip) | Month | Saves / month vs driving |
+|---|---|---|---|---|---|---|
+| ⭐ Park at Metropark *(Best overall · Cheapest)* | 7:59 → 8:38 | 6:00 PM, home 7:33 | **$27.60** | **$45.20** | $773.92 | **$1,215.87** |
+| Park at Princeton Jct. | 7:38 → 8:36 | 5:55 PM, home 7:04 | $32.11 | $52.20 | $824.00 | $1,165.79 |
+| Park at Hamilton | 7:30 → 8:36 | 5:55 PM, home 7:22 | $34.49 | $55.96 | $905.92 | $1,083.87 |
+| Park at Secaucus | 8:37 → 8:49 | 5:55 PM, home 7:18 | $53.04 | $75.42 | $1,512.83 | $476.96 |
+| Drive all the way *(Fastest)* | — | leave 5:30, home 6:47 | **$76.17** | **$95.51** | $1,989.79 | — |
 
-Drive breakdown: Turnpike 9→16E $10.29 + Lincoln Tunnel $16.79 + congestion toll $6.00 +
-garage $33.92 + gas $9.17.
+Door to door one-way: 115 / 113 / 113 / 126 / 82 min. Per year: Metropark $9,287.04 vs driving
+$23,877.48, so it saves **$14,590.44 a year**.
 
-**B. Lawrenceville → Bryant Park:** Metropark $28.62 / 111 min (best, cheapest) · Princeton Jct
-$33.12 / 109 · Hamilton $33.89 / 109 · Secaucus $54.05 / 122 · Drive $77.16 / 89 (fastest).
+Drive breakdown, morning: Turnpike 9→16E $10.29 + Lincoln Tunnel $16.79 + congestion toll $6.00
++ garage $33.92 + gas $9.17 = $76.17. Home: Turnpike 16E→9 $10.29 (peak, entered 5:38 PM) +
+gas $9.05 = $19.34. Lincoln Tunnel westbound $0 (tolled into New York only), congestion toll $0
+(once a day), garage $0 (day rate already paid). Day = **$95.51**.
 
-**C. Plainsboro → Times Square:** Metropark $27.17 / 115 min (best, cheapest) · Princeton Jct
-$31.96 / 113 · Hamilton $34.76 / 129 · Secaucus $54.08 / 126 · Drive $77.08 / 77 (fastest;
-Turnpike 8A→16E $11.45).
+Metropark day: gas $4.55 + $4.55, parking $10.00 once, rail $13.05 + $13.05 = $45.20 (walks
+to Times Square, no subway). The drive home uses one mile of the Garden State Parkway (131→130),
+which passes no toll plaza: shown as a sourced $0.00. Monthly = 20.8 days × $19.10 +
+$376.00 NJ TRANSIT monthly pass (cheaper than 42 one-way tickets at $543.75).
 
-Bryant Park and Times Square give the same costs; only the final walk differs.
+**B. Lawrenceville → Bryant Park:** one-way / day / month / saves-per-month: Metropark $28.62 /
+$47.16 / $814.75 / $1,216.50 (best, cheapest) · Princeton Jct $33.12 / $54.15 / $864.62 /
+$1,166.63 · Hamilton $33.89 / $54.79 / $881.54 / $1,149.71 · Secaucus $54.05 / $77.37 /
+$1,553.46 / $477.79 · Drive $77.16 / $97.50 / $2,031.25 (fastest, 89 min).
+
+**C. Plainsboro → Times Square:** Metropark $27.17 / $44.36 / $756.42 / $1,273.58 (best,
+cheapest) · Princeton Jct $31.96 / $52.29 / $825.88 / $1,204.12 · Hamilton $34.76 / $56.47 /
+$916.54 / $1,113.46 · Secaucus $54.08 / $77.60 / $1,558.25 / $471.75 · Drive $77.08 / $97.44 /
+$2,030.00 (fastest, 77 min; Turnpike 8A→16E $11.45 in, 16E→8A $11.45 home).
+
+Bryant Park and Times Square give the same costs; only the final walk differs. Ranking uses the
+morning trip, and in all three scenarios the daily totals rank the options in the same order.
 
 ---
 
@@ -125,7 +156,9 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 |---|---|---|
 | Train times | NJ TRANSIT GTFS via the developer portal (test host) | scheduled |
 | Rail fares | NJ TRANSIT fare chart, effective 2026-07-01 | scheduled |
-| NJ Turnpike | NJTA 2026 Class 1 toll schedule (PDF) | scheduled |
+| NJ Turnpike (both directions) | NJTA 2026 Class 1 toll schedule (PDF) | scheduled |
+| Garden State Parkway plazas | NJTA 2026 Parkway E-ZPass rates (PDF) | scheduled |
+| NJ TRANSIT monthly passes | Same NJ TRANSIT fare chart PDF | scheduled |
 | Lincoln Tunnel | PANYNJ July 2026 toll sheet (**human-verified**) | scheduled |
 | Congestion toll + credit | mta.info | scheduled |
 | Hamilton / Metropark parking | NJ TRANSIT station pages | scheduled |
@@ -135,6 +168,8 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 | Gas $4.347/gal | EIA weekly, Central Atlantic | estimated |
 | 25.5 mpg | EPA Trends 2024 (27.2 minus 1.7 for EVs) | estimated |
 | Drive times | OSRM / OpenStreetMap, free-flow | estimated |
+| 250 working days a year (20.8 a month) | OPM 2026 federal holidays: 261 weekdays − 11 holidays | estimated |
+| Head home at 5:30 PM | Corridor data file (a default the user can change) | — |
 
 ---
 
@@ -154,6 +189,13 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 - **Not yet human-spot-checked:** the rail fares, lot rates and Turnpike rates were read from
   official documents, but CLAUDE.md requires a human check before they count as verified.
 - "Arrive by" planning isn't implemented in the demo; it uses "leave at".
+- **Monthly and annual figures assume you commute every working day** (250 a year, no
+  vacation or remote days) and use daily garage and lot rates. Monthly garage contracts and lot
+  permits are not modeled; a Midtown monthly garage contract would narrow driving's gap.
+- The ranking and badges use the morning trip. The daily totals happen to rank the options the
+  same way in all three scenarios.
+- The Garden State Parkway is modeled only between its Raritan and Union plazas (mileposts
+  125.5–142.5); a Parkway trip outside that stretch shows its toll as unknown.
 
 ## 6. Phase 2 (what comes next)
 
@@ -183,6 +225,15 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 - **"Where's the AI?"** Deliberately out of scope tonight. The plan uses an LLM only to *parse*
   requests into a validated schema and to *phrase* explanations from computed numbers, never to
   invent routes or prices.
-- **"What did you test?"** 101 automated tests (cost math, toll detection, ranking, unknown
-  handling, session tokens, API contract), plus end-to-end runs against the real NJ TRANSIT feed,
-  including one with all network access blocked.
+- **"What did you test?"** 122 automated tests (cost math, toll detection in both directions,
+  once-a-day charges, monthly-pass math, ranking, unknown handling, session tokens, API
+  contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
+  network access blocked.
+- **"How do you get the monthly savings?"** Daily cost × 20.8 working days, where 20.8 comes
+  from the federal holiday calendar and is labeled *estimated*. For rail, the system compares a
+  monthly pass with two tickets a day and uses whichever is cheaper. If any daily cost is
+  unknown, the monthly figure and the savings show *unknown* too, so a partial sum never poses
+  as a total.
+- **"Why did the API version change?"** Adding the trip home added a request field and a
+  response field, so the API contract went from 0.1.0 to 0.2.0. A test fails the build if the
+  code and the contract disagree.
