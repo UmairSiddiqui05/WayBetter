@@ -2,6 +2,13 @@
 
 You are building **WayBetter**, the park-and-ride trip planner. Read this file fully before any work.
 
+## ⚠️ ACTIVE OVERRIDE — read [DEMO-SPRINT.md](DEMO-SPRINT.md) first
+
+A time-boxed demo sprint is active (decision D-18). While DEMO-SPRINT.md says **ACTIVE**, it sits
+at the **top** of the precedence list below and its scope overrides are pre-approved by the
+human — do not stop to ask about them as "material deviations." Everything DEMO-SPRINT.md lists
+under "Rules that STILL apply" remains binding.
+
 ## Document precedence (conflicts resolve top-down)
 
 1. **[PLAN.md](PLAN.md)** — approved implementation plan. Authoritative for the launch build, including its PRD amendments section.

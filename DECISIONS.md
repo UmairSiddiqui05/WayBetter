@@ -21,5 +21,6 @@ Locked decisions with rationale. **Do not relitigate these during implementation
 | D-15 | No accounts at launch; server-issued anonymous session tokens; nullable `user_id` schema-side only | Auth/PII burden unearned until sync matters; no spoofable client IDs (Codex R2) | 2026-07-19 |
 | D-16 | Ops from day one: off-box graph builds, atomic versioned bundle, blue/green OTP, backups + restore drill, spend alerts | Single-box hobby ops are the actual failure mode (Codex R1/R2) | 2026-07-19 |
 | D-17 | Reviewer model for plan reviews: gpt-5.5/xhigh (gpt-5.6 unavailable on ChatGPT-account auth — verified 400) | Highest available cross-model reviewer | 2026-07-19 |
+| D-18 | **Demo sprint (2026-10-14/15)** for a Deloitte GPS portfolio interview: temporarily supersedes D-05 (OSRM + direct-GTFS adapters instead of Mapbox/OTP), D-06/D-16 (no Docker, local uvicorn), D-02/D-07 (one static Leaflet page, one rail corridor). Interfaces, contract, data-not-code, and provenance rules stay. Details in DEMO-SPRINT.md | One reliable, explainable demo in ~5 hours; provider interfaces make the swap back to Mapbox/OTP a config change | 2026-10-14 |
 
 Add new decisions as rows with the next D-number; never edit old rows — supersede with a new row referencing the old.
