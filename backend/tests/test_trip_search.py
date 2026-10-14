@@ -189,12 +189,15 @@ def test_api_requires_a_server_issued_session_token(
     app.dependency_overrides.clear()
 
 
-def test_unknown_request_fields_are_rejected(app: FastAPI) -> None:
+def test_unknown_request_fields_are_rejected(app: FastAPI, service: TripSearchService) -> None:
+    # Fake providers: CI has no GTFS archive (gitignored, needs a portal login to fetch).
+    app.dependency_overrides[get_trip_service] = lambda: service
     client = TestClient(app)
     token = client.post("/api/v1/session").json()["session_token"]
     body = {**request().model_dump(mode="json"), "user_id": "spoofed"}  # N-06
 
     response = client.post("/api/v1/trip/search", json=body, headers={"X-Session-Token": token})
+    app.dependency_overrides.clear()
 
     assert response.status_code == 422
 

@@ -154,6 +154,13 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, CI fix):** CI's backend job failed on every push since
+  step 4 (`30e3654`..`39dc873`; 100/101 passed). Cause: `test_unknown_request_fields_are_rejected`
+  did not override `get_trip_service`, so FastAPI built the real service, which opens
+  `data/gtfs/njt_rail.zip` — gitignored and only fetchable with the NJT portal login, so absent on
+  CI runners. Fixed by injecting the fake-provider service like the other API tests. Verified
+  locally with the zip moved aside (CI conditions): 101 passed. No app code changed.
+
 - **2026-10-14 — Claude (DEMO SPRINT step 7, DEMO.md):** Wrote [DEMO.md](DEMO.md): start command
   (verified from a clean `env -i` shell on a spare port: health, page, docs, and a search that
   matches the documented numbers), first-time setup, morning-of checklist, a ~6-minute talk
