@@ -44,8 +44,10 @@
   .badge.best { background: var(--win); }
   .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .summary { font-weight: 700; font-size: 16px; }
-  .totals { text-align: right; white-space: nowrap; }
+  .totals { display: flex; gap: 14px; text-align: right; white-space: nowrap; }
+  .totals .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .cost { font-size: 22px; font-weight: 800; }
+  .cost.day { color: var(--brand); }
   .mins { color: var(--muted); font-size: 14px; }
   .explain { margin: 6px 0 8px; font-size: 14px; }
   .timeline { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
@@ -53,6 +55,15 @@
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
   td.amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px; }
+  th { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: right; padding: 0 0 4px 8px; }
+  th:first-child { text-align: left; padding-left: 0; }
+  td.amt.day, th.day { color: var(--brand); font-weight: 700; }
+  .home { font-size: 13px; color: var(--muted); margin: -2px 0 8px; }
+  .home b { color: var(--ink); font-weight: 600; }
+  .periods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--bg); font-size: 14px; }
+  .periods .big { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .periods .save { color: var(--win); }
+  .periods .full { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
   td .note { display: block; font-size: 12px; color: var(--muted); }
   .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: .03em; }
   .chip.scheduled { background: var(--sched-bg); color: var(--sched); }
@@ -87,13 +98,14 @@
       <div><label for="destination">To</label><select id="destination"></select></div>
       <div class="row">
         <div><label for="when">Leave at</label><input id="when" type="datetime-local"></div>
-        <div><label for="sort">Rank by</label>
-          <select id="sort">
-            <option value="best_overall">Best overall</option>
-            <option value="cheapest">Cheapest</option>
-            <option value="fastest">Fastest</option>
-          </select></div>
+        <div><label for="home">Head home at</label><input id="home" type="time"></div>
       </div>
+      <div><label for="sort">Rank by (morning trip)</label>
+        <select id="sort">
+          <option value="best_overall">Best overall</option>
+          <option value="cheapest">Cheapest</option>
+          <option value="fastest">Fastest</option>
+        </select></div>
       <button id="go" type="submit">Compare</button>
       <div id="status"></div>
     </form>
@@ -115,6 +127,7 @@ for (const [sel, list] of [["origin", PRESETS.origins], ["destination", PRESETS.
   for (const p of list) $(sel).add(new Option(p.label, p.id));
 }
 $("when").value = PRESETS.default_departure;
+$("home").value = PRESETS.default_return_time;
 
 const map = L.map("map", { zoomControl: true }).setView([40.55, -74.3], 9);
 // Offline fallback: Natural Earth state outlines in a pane *below* the tiles. Online, OSM tiles
@@ -163,7 +176,8 @@ const clock = (iso) => { // server sends local time with offset; show it as-is
   const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
   return `${h}:${String(m).padStart(2, "0")} ${ap}`;
 };
-const money = (v) => (v === null || v === undefined) ? "unknown" : `$${v.toFixed(2)}`;
+const money = (v) => (v === null || v === undefined) ? "unknown"
+  : `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const chip = (p) => `<span class="chip ${esc(p)}">${esc(p)}</span>`;
 const pin = (cls, text) => L.divIcon({ className: "", html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
@@ -179,29 +193,67 @@ async function getSession() {
 function legText(leg) {
   const mins = `${Math.round(leg.duration_minutes)} min`;
   if (leg.mode === "car") return `🚗 <b>Drive</b> ${mins}`;
-  if (leg.mode === "walk") return leg.leg_id === "walk-1" ? `🅿️ <b>Park &amp; walk</b> ${mins}` : `🚶 <b>Walk</b> ${mins}`;
+  if (leg.mode === "walk") {
+    if (leg.leg_id === "walk-1") return `🅿️ <b>Park &amp; walk</b> ${mins}`;
+    if (leg.leg_id === "home-walk-car") return `🅿️ <b>To car</b> ${mins}`;
+    return `🚶 <b>Walk</b> ${mins}`;
+  }
   if (leg.route_name === "Subway") return `🚇 <b>Subway</b> ${mins}`;
   return `🚆 <b>${clock(leg.start_time)}</b> ${esc(leg.route_name)} → <b>${clock(leg.end_time)}</b>`;
 }
 
+const COST_ROWS = [["Gas", "gas_or_ev"], ["Parking", "parking"], ["Train / subway", "transit_fare"],
+                   ["Tolls", "tolls"], ["Congestion toll", "congestion_fee"]];
+const noteHtml = (n) => esc(n).split("; ").join("<br>");
+
+function costTable(c, rt) {
+  const home = rt ? rt.return_cost_breakdown : null, day = rt ? rt.daily_cost_breakdown : null;
+  const head = rt ? `<tr><th></th><th>Morning</th><th>Home</th><th class="day">Day</th></tr>` : "";
+  const rows = COST_ROWS.map(([name, key]) => {
+    const m = c[key], h = home && home[key], d = day && day[key];
+    const prov = d ? d.provenance : m.provenance;
+    const notes = [m.note, h && h.note !== m.note ? `Home: ${h.note}` : null].filter(Boolean);
+    return `<tr><td>${name}${chip(prov)}<span class="note">${notes.map(noteHtml).join("<br>")}</span></td>
+      <td class="amt">${money(m.amount)}</td>${rt ? `<td class="amt">${money(h.amount)}</td><td class="amt day">${money(d.amount)}</td>` : ""}</tr>`;
+  }).join("");
+  const total = `<tr><td><b>Total</b></td><td class="amt"><b>${money(c.total)}</b></td>${rt
+    ? `<td class="amt"><b>${money(home.total)}</b></td><td class="amt day">${money(day.total)}</td>` : ""}</tr>`;
+  return `<table>${head}${rows}${total}</table>`;
+}
+
+function periods(rt) {
+  if (!rt) return "";
+  const s = rt.savings_vs_drive;
+  const saved = (e, unit) => e.amount === null ? `savings ${unit} unknown`
+    : e.amount >= 0 ? `saves ${money(e.amount)}${unit}` : `costs ${money(-e.amount)}${unit} more`;
+  return `<div class="periods">
+    <div>Month${chip(rt.monthly_cost.provenance)}<div class="big">${money(rt.monthly_cost.amount)}</div></div>
+    <div>Year${chip(rt.annual_cost.provenance)}<div class="big">${money(rt.annual_cost.amount)}</div></div>
+    ${s ? `<div class="full save" style="font-size:14px;font-weight:700">vs driving: ${saved(s.daily, "/day")} · ${saved(s.monthly, "/month")} · ${saved(s.annual, "/year")}</div>` : ""}
+    <div class="full">${esc(rt.monthly_cost.note)}</div>
+  </div>`;
+}
+
 function renderCard(r, idx) {
-  const c = r.cost_breakdown;
+  const c = r.cost_breakdown, rt = r.round_trip;
   const labels = (r.label || "").split(" · ").filter(Boolean);
-  const rows = [["Gas", c.gas_or_ev], ["Parking", c.parking], ["Train / subway", c.transit_fare],
-                ["Tolls", c.tolls], ["Congestion toll", c.congestion_fee]]
-    .map(([name, e]) => `<tr><td>${name}${chip(e.provenance)}<span class="note">${esc(e.note).split("; ").join("<br>")}</span></td>
-      <td class="amt">${money(e.amount)}</td></tr>`).join("");
   const last = r.legs[r.legs.length - 1];
   return `<div class="card option ${idx === 0 ? "winner selected" : ""}" data-idx="${idx}">
     <div class="badges">${labels.map((l) => `<span class="badge ${l === "Best overall" ? "best" : ""}">${esc(l)}</span>`).join("")}</div>
     <div class="head">
       <div class="summary">${esc(r.summary)}</div>
-      <div class="totals"><div class="cost">${money(c.total)}</div>
-        <div class="mins">${Math.round(r.total_minutes)} min · arrive ${clock(last.end_time)}</div></div>
+      <div class="totals">
+        <div><div class="k">One-way</div><div class="cost">${money(c.total)}</div></div>
+        ${rt ? `<div><div class="k">Round trip / day</div><div class="cost day">${money(rt.daily_cost_breakdown.total)}</div></div>` : ""}
+      </div>
     </div>
+    <div class="mins">${Math.round(r.total_minutes)} min · arrive ${clock(last.end_time)}${rt ? ` · ${Math.round(rt.daily_minutes)} min a day door to door` : ""}</div>
     <div class="explain">${esc(r.explanation.text)}</div>
     <div class="timeline">${r.legs.map(legText).join("<span>→</span>")}</div>
-    <table>${rows}<tr><td><b>Total</b></td><td class="amt"><b>${money(c.total)}</b></td></tr></table>
+    ${rt ? `<div class="home"><b>Home:</b> ${esc(rt.return_summary)}</div>
+      <div class="timeline">${rt.return_legs.map(legText).join("<span>→</span>")}</div>` : ""}
+    ${costTable(c, rt)}
+    ${periods(rt)}
     ${r.warnings.length ? `<details><summary>${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""}</summary><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
   </div>`;
 }
@@ -260,6 +312,7 @@ $("form").addEventListener("submit", async (e) => {
       origin: { lat: o.lat, lng: o.lng, label: o.label },
       destination: { lat: d.lat, lng: d.lng, label: d.label },
       time_mode: "leave_at", target_time: $("when").value + ":00",
+      return_time: $("home").value || null,
       preferences: { sort_mode: $("sort").value },
     };
     let r = await fetch("/api/v1/trip/search", { method: "POST",

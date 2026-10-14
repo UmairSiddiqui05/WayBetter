@@ -46,6 +46,7 @@ def demo_page(service: Annotated[TripSearchService, Depends(get_trip_service)]) 
         "default_departure": _next_weekday_morning(datetime.now(service.timezone)).strftime(
             "%Y-%m-%dT%H:%M"
         ),
+        "default_return_time": corridor.commute.default_return_time,
     }
     html = TEMPLATE.read_text(encoding="utf-8").replace(
         "/*__PRESETS__*/null", json.dumps(presets).replace("</", "<\\/")

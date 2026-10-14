@@ -275,7 +275,7 @@ def test_a_requested_return_time_overrides_the_default(service: TripSearchServic
 
 
 def test_return_before_departure_is_rejected(service: TripSearchService) -> None:
-    with pytest.raises(TripSearchError, match="return_time"):
+    with pytest.raises(TripSearchError, match="head-home time"):
         service.search(request(return_time="06:30"), NOW)
 
 

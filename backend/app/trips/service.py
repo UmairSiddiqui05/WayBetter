@@ -251,7 +251,9 @@ class TripSearchService:
         hour, minute = (int(part) for part in hhmm.split(":"))
         at = depart.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if at <= depart:
-            raise TripSearchError("return_time must be later the same day than the departure")
+            raise TripSearchError(
+                "The head-home time must be later the same day than the departure"
+            )
         return at
 
     # -- options -------------------------------------------------------------------
@@ -946,4 +948,8 @@ class TripSearchService:
             "Tolls assume E-ZPass unless cash is selected; "
             "NJ Turnpike off-peak rates require a New Jersey E-ZPass.",
             "Prices come from agency sources dated in the data files; verify before you travel.",
+            "Daily round trip: the trip home leaves at the return time; parking and the congestion "
+            "toll are charged once a day. Monthly and annual figures assume "
+            f"{self._corridor.commute.working_days_per_year} working days a year (estimated) and "
+            "do not include monthly garage or lot permits.",
         ]
