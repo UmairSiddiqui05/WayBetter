@@ -158,6 +158,26 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, page redesign round 3 — "less generic", human-approved):**
+  Page only (`backend/app/web/index.html`); no API change. (1) Data status is carried by each
+  number's own type instead of an icon after every number: plain = scheduled/live, dotted
+  underline = estimated, red = unknown; tooltip and screen-reader text give the word; sentences
+  (trip home, explanation, monthly note) get a small status word instead of an underline; the
+  detail view still prints the word beside every figure (N-02). (2) Transit-signage palette:
+  solid black header, signal-yellow "Better", black buttons/tabs; blue is now only the rail mode.
+  (3) The legs line is merged into the time bar (minutes or train times under each segment).
+  (4) Row title is the boarding station from the server's train leg (title-cased), with the
+  server summary underneath; drive rows show miles. (5) A cost bar under the time bar (gas,
+  parking, train, tolls, congestion, same scale on every row) with a colour key. (6) A small
+  time-vs-cost chart above the list (one dot per option, labels in a leader-line column, click a
+  dot to open it; options with an unknown cost are listed as not plotted). (7) One tag per row:
+  the server's first label. (8) The page runs a comparison on load; `?from=<preset>&to=<preset>&at=
+  YYYY-MM-DDTHH:MM` pins it (no date in code). Verified: Scenario A matches DEMO.md in Trip / Day /
+  Month including per-day cost parts; Fastest tab puts Drive first; home 7:15 PM gives $47.74/day
+  saved and reset restores $50.31; 375 px no sideways scroll; no console errors; the network-
+  blocked server (8001, `?offline`) auto-runs with no outside requests. `make check` green (128).
+  Demo URL: `http://localhost:8000/?at=2026-10-15T07:00`. Requirements: F-18, N-01, N-02.
+
 - **2026-10-14 — Claude (DEMO SPRINT, page redesign round 2 — human feedback):**
   The human found the grey map too bare, the panel too plain and the rows too thin. Changes,
   page only (`backend/app/web/index.html`): (a) map tiles back to full-colour OpenStreetMap (the
