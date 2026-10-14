@@ -158,6 +158,25 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, page redesign round 2 — human feedback):**
+  The human found the grey map too bare, the panel too plain and the rows too thin. Changes,
+  page only (`backend/app/web/index.html`): (a) map tiles back to full-colour OpenStreetMap (the
+  grey CSS filter is gone; the offline basemap uses its original colours); (b) brand colour
+  again: navy-to-blue header with the blue "Better" logo, blue Compare button, tabs, Trip/Day/Month
+  toggle, chips and selected row; Best overall rows tinted green, Cheapest / Fastest tags teal /
+  purple; (c) a middle ground of detail on each row: the selected number (Trip by default) plus
+  the other two server numbers beside it, the time bar, the legs as coloured mode icons with
+  minutes or train times, depart–arrive + minutes + savings, the cost parts behind the number
+  (one way, or per day under Day / Month; zero-cost parts left to the detail view), and the trip
+  home line. Every number still carries its status icon. A new Compare always returns to Trip.
+  Fixes found while verifying: the search card's `.rail` class collided with the rail-mode class
+  (padded train items and the train step icon) — renamed `.route-rail`; time ranges use an en dash
+  because Public Sans has no arrow glyph; a ResizeObserver keeps map tiles aligned when the map box
+  changes size. `make check` green (128). Verified in the browser: Scenario A matches DEMO.md in
+  Trip / Day / Month including the per-day cost parts and the 7:33 PM home time; 375 px has no
+  sideways scroll; no console errors; the network-blocked server (8001, `?offline`) renders with no
+  outside requests. Requirements: F-18, N-01, N-02.
+
 - **2026-10-14 — Claude (DEMO SPRINT, calmer page redesign — human-approved scope extension, page only):**
   Safety tag `demo-safe-1014-roundtrip` pushed on the pre-redesign main. The page
   (`backend/app/web/index.html`) is now a Google-Maps-style layout: a search card (From / To with
