@@ -120,17 +120,26 @@ feeds:
     agency_name: NJ Transit Rail
     modes: [commuter_rail]
     format: gtfs
-    enabled: false
     requires_credentials: true
     credential_env: [NJT_DEVELOPER_USERNAME, NJT_DEVELOPER_PASSWORD]
-    blocked_reason: >
-      NJ Transit requires developer-portal registration and terms acceptance.
-      Creating accounts and accepting terms is a human task and was explicitly
-      out of scope for the agent run (PLAN risk item, PROGRESS blocker B-3).
+    # Endpoints from NJ TRANSIT's published spec,
+    # https://raildata.njtransit.com/swagger/GTFS/swagger.json (read 2026-10-14):
+    # POST getToken (username, password) -> {"UserToken": ...}; POST getGTFS (token) -> zip.
+    url: https://raildata.njtransit.com/api/GTFSRT/getGTFS
+    auth:
+      token_url: https://raildata.njtransit.com/api/GTFSRT/getToken
+      username_field: username
+      password_field: password
+      token_response_field: UserToken
+      token_form_field: token
     license:
       name: NJ TRANSIT Developer Portal Terms
-      url: https://www.njtransit.com/developer-resources
+      url: https://developer.njtransit.com
       verified: false
+      notes: >
+        Portal account approved for the human on 2026-10-14 (GTFS-RAIL active). The
+        agent has not read the terms text; a human must confirm they permit this use
+        and set verified: true.
 
   - feed_id: njt_bus
     agency_name: NJ Transit Bus (commuter)
@@ -139,7 +148,7 @@ feeds:
     enabled: false
     requires_credentials: true
     credential_env: [NJT_DEVELOPER_USERNAME, NJT_DEVELOPER_PASSWORD]
-    blocked_reason: Same NJ Transit portal registration blocker as njt_rail.
+    blocked_reason: Out of demo-sprint scope (rail corridor only); same portal login as njt_rail once enabled.
     license:
       name: NJ TRANSIT Developer Portal Terms
       url: https://www.njtransit.com/developer-resources

@@ -15,6 +15,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from app.ingestion.feeds import (
     FeedDownloadError,
     archive_path,
@@ -94,14 +96,19 @@ def cmd_check_region(args: argparse.Namespace) -> int:
 
 
 def cmd_fetch(args: argparse.Namespace) -> int:
+    # Credentialed feeds read their portal login from .env (never from the region
+    # config). Real environment variables win over the file.
+    load_dotenv(REPO_ROOT / ".env", override=False)
     region = load_region_config(args.region)
     gtfs_dir = resolve_region_path(args.gtfs_dir)
     targets = region.fetchable_feeds()
 
     skipped = [f for f in region.feeds if f not in targets]
     for feed in skipped:
-        fallback = "needs credentials" if feed.requires_credentials else "disabled"
-        reason = feed.blocked_reason or fallback
+        if feed.blocked_reason or not feed.enabled:
+            reason = feed.blocked_reason or "disabled"
+        else:
+            reason = f"set {', '.join(feed.credential_env)} in .env to fetch"
         print(f"skip  {feed.feed_id:<12} {' '.join(reason.split())[:90]}")
 
     if not targets:

@@ -106,9 +106,23 @@ def test_blocked_and_disabled_feeds_explain_themselves(nyc: RegionConfig) -> Non
 
 
 def test_fetchable_feeds_excludes_blocked_and_credentialed(nyc: RegionConfig) -> None:
-    fetchable = {f.feed_id for f in nyc.fetchable_feeds()}
+    fetchable = {f.feed_id for f in nyc.fetchable_feeds(env={})}
 
     assert fetchable == {"mta_subway", "mta_lirr", "mta_mnr"}
+
+
+def test_credentialed_feed_becomes_fetchable_once_credentials_exist(nyc: RegionConfig) -> None:
+    env = {"NJT_DEVELOPER_USERNAME": "someone", "NJT_DEVELOPER_PASSWORD": "secret"}
+
+    fetchable = {f.feed_id for f in nyc.fetchable_feeds(env=env)}
+
+    assert fetchable == {"mta_subway", "mta_lirr", "mta_mnr", "njt_rail"}
+
+
+def test_template_placeholder_does_not_count_as_a_credential(nyc: RegionConfig) -> None:
+    env = {"NJT_DEVELOPER_USERNAME": "placeholder", "NJT_DEVELOPER_PASSWORD": "placeholder"}
+
+    assert "njt_rail" not in {f.feed_id for f in nyc.fetchable_feeds(env=env)}
 
 
 def test_zone_polygons_are_referenced_by_path_not_inlined(nyc: RegionConfig) -> None:

@@ -153,6 +153,24 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, NJ Transit feed wiring):** Human got NJT developer-portal
+  access (GTFS-RAIL, GTFS-BUS, RailData, BUSDATA all *Active*) — B-3 partly resolved. Claude in
+  Chrome was not connected, so the portal page was not read; instead the public spec
+  `https://raildata.njtransit.com/swagger/GTFS/swagger.json` gave the flow: `POST getToken`
+  (multipart `username`/`password` → `{"Authenticated","UserToken"}`), then `POST getGTFS`
+  (multipart `token`) → zip. **What changed:** `TokenAuth` block on `FeedSource` (endpoint and
+  field names are config, N-03); `fetchable_feeds()` now includes a credentialed feed once its
+  env vars hold real (non-`placeholder`) values; `download_feed` does the token exchange and
+  refuses any non-zip response so an API error can never replace a good archive; `waybetter-ingest
+  fetch` loads `.env` (env vars win). `njt_rail` enabled in `nyc-metro.yaml`; `njt_bus` stays
+  disabled (out of sprint scope). Credentials are read from the environment only — never logged,
+  never in the provenance sidecar (tested). **Files:** `backend/app/regions/schema.py`,
+  `backend/app/ingestion/{feeds,cli}.py`, `backend/tests/{test_feed_download,test_region_config}.py`,
+  `data/regions/nyc-metro.yaml`. 70 tests, ruff, mypy green. **Not yet exercised against the real
+  API:** the human must put `NJT_DEVELOPER_USERNAME`/`NJT_DEVELOPER_PASSWORD` in `.env` first.
+  NJT licence stays `verified: false` until the human confirms the portal terms. IDs: N-03, N-04,
+  N-08, N-09.
+
 - **2026-10-14 — Claude (DEMO SPRINT step 2, local run):** Human chose Metro-North Harlem Line →
   Grand Central. No code changed. Created `backend/.venv` with **Python 3.13** (no 3.12 on this
   Mac; pyproject allows ≥3.12) via `make install PYTHON=/opt/miniconda3/bin/python3.13`, and

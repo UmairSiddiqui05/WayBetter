@@ -16,6 +16,8 @@ Two rules this schema enforces structurally:
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -74,6 +76,22 @@ class FeedLicense(StrictModel):
     Unverified is the honest default — an agent must never assert it."""
 
 
+class TokenAuth(StrictModel):
+    """Two-step credentialed download: POST the portal credentials to `token_url`,
+    then POST the returned token to the feed `url`. Endpoint shapes are data so a
+    second agency with the same pattern is config, not code (N-03)."""
+
+    token_url: str
+    username_field: str
+    password_field: str
+    token_response_field: str
+    token_form_field: str
+
+
+PLACEHOLDER_CREDENTIAL = "placeholder"
+"""The `.env.example` stand-in value; treated the same as an unset variable."""
+
+
 class FeedSource(StrictModel):
     """One GTFS (or GTFS-RT) feed in the region's registry."""
 
@@ -91,6 +109,9 @@ class FeedSource(StrictModel):
     credential_env: tuple[str, ...] = ()
     """Environment variable names holding this feed's credentials. Never the
     credentials themselves — those come from the environment (CLAUDE.md)."""
+    auth: TokenAuth | None = None
+    """How credentials are exchanged for the archive. With `auth`, `credential_env`
+    is `(username_var, password_var)`."""
     blocked_reason: str | None = None
     """Set when a feed is known-unfetchable right now (missing credentials,
     unreachable host). Keeps the registry honest instead of silently short."""
@@ -103,7 +124,19 @@ class FeedSource(StrictModel):
             )
         if self.enabled and not self.url and not self.requires_credentials:
             raise ValueError(f"feed {self.feed_id!r} is enabled but has no url")
+        if self.auth and (not self.requires_credentials or len(self.credential_env) != 2):
+            raise ValueError(
+                f"feed {self.feed_id!r} has token auth, so it must require credentials "
+                "and name exactly two credential_env vars (username, password)"
+            )
         return self
+
+    def has_credentials(self, env: Mapping[str, str]) -> bool:
+        """True when every named credential variable holds a real value."""
+        return all(
+            env.get(var, "").strip() not in ("", PLACEHOLDER_CREDENTIAL)
+            for var in self.credential_env
+        )
 
 
 class CityDrivingZone(StrictModel):
@@ -175,6 +208,13 @@ class RegionConfig(StrictModel):
     def enabled_feeds(self) -> tuple[FeedSource, ...]:
         return tuple(f for f in self.feeds if f.enabled)
 
-    def fetchable_feeds(self) -> tuple[FeedSource, ...]:
+    def fetchable_feeds(self, env: Mapping[str, str] | None = None) -> tuple[FeedSource, ...]:
         """Enabled, unblocked, and either keyless or holding its credentials."""
-        return tuple(f for f in self.enabled_feeds() if f.url and not f.blocked_reason)
+        env = os.environ if env is None else env
+        return tuple(
+            f
+            for f in self.enabled_feeds()
+            if f.url
+            and not f.blocked_reason
+            and (not f.requires_credentials or f.has_credentials(env))
+        )
