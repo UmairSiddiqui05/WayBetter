@@ -142,3 +142,104 @@ def test_fuel_cost_is_miles_over_mpg_times_price(pricing: PricingData) -> None:
 def test_worst_provenance_wins() -> None:
     assert costs.worst(Provenance.SCHEDULED, Provenance.ESTIMATED) is Provenance.ESTIMATED
     assert costs.worst(Provenance.ESTIMATED, Provenance.UNKNOWN) is Provenance.UNKNOWN
+
+
+THU_5_30PM = datetime(2026, 10, 15, 17, 30, tzinfo=NY)
+THU_8PM = datetime(2026, 10, 15, 20, 0, tzinfo=NY)
+
+
+def lincoln_home_to_exit(exit_: str) -> DriveRoute:
+    """Shape of the real OSRM Times Square -> Princeton route (westbound, evening)."""
+    return route(
+        step("Lincoln Tunnel", "NY 495", lat=40.7589, lon=-73.9992, maneuver="merge"),
+        step(
+            "New Jersey Turnpike Eastern Spur",
+            "I 95; NJTP",
+            lat=40.7741,
+            lon=-74.0603,
+            maneuver="merge",
+            meters=45000,
+        ),
+        step(exits=exit_, lat=40.4861, lon=-74.3992, maneuver="off ramp"),
+        step("Nassau Street", "NJ 27", lat=40.3504, lon=-74.6571, meters=20000),
+    )
+
+
+def test_turnpike_is_charged_on_the_drive_home_too(pricing: PricingData) -> None:
+    """F-13: unlike the Lincoln Tunnel, the Turnpike tolls both directions."""
+    toll = pricing.ticket_tolls[0]
+    evening = costs.ticket_toll(lincoln_home_to_exit("9"), toll, THU_5_30PM, "ezpass")
+
+    rate = toll.rate("16E", "9")
+    assert evening is not None and rate is not None
+    assert evening.amount == rate.ezpass_peak  # enters ~17:31, inside the 4:30-6:30 p.m. peak
+    assert "16E -> 9" in evening.note
+
+
+def test_turnpike_evening_off_peak_after_the_peak_window(pricing: PricingData) -> None:
+    toll = pricing.ticket_tolls[0]
+    late = costs.ticket_toll(lincoln_home_to_exit("8A"), toll, THU_8PM, "ezpass")
+
+    rate = toll.rate("16E", "8A")
+    assert late is not None and rate is not None
+    assert late.amount == rate.nj_ezpass_off_peak
+
+
+def test_turnpike_return_rates_mirror_the_morning_rates(pricing: PricingData) -> None:
+    """The NJTA grid is symmetric; the return rows were read from the same PDF."""
+    toll = pricing.ticket_tolls[0]
+    for a, b in (("9", "16E"), ("8A", "16E"), ("9", "15X"), ("8A", "15X")):
+        there, back = toll.rate(a, b), toll.rate(b, a)
+        assert there is not None and back is not None
+        prices = ("ezpass_peak", "nj_ezpass_off_peak", "cash")
+        assert [getattr(there, k) for k in prices] == [getattr(back, k) for k in prices]
+
+
+def test_drive_home_through_the_lincoln_tunnel_pays_no_tunnel_toll(pricing: PricingData) -> None:
+    tunnel = pricing.crossing_tolls[0]
+
+    assert costs.crossing_toll(lincoln_home_to_exit("9"), tunnel, THU_5_30PM, "ezpass") is None
+
+
+def metropark_home_on_parkway(exit_: str) -> DriveRoute:
+    """Shape of the real OSRM Metropark -> Princeton route: one mile of the Parkway."""
+    return route(
+        step("Lincoln Highway", "NJ 27", lat=40.5688, lon=-74.3296, maneuver="depart"),
+        step(
+            "Garden State Parkway",
+            "Garden State Parkway",
+            lat=40.5706,
+            lon=-74.3283,
+            maneuver="merge",
+        ),
+        step(exits=exit_, lat=40.5566, lon=-74.3195, maneuver="off ramp"),
+        step("", "US 1", lat=40.5517, lon=-74.3191, meters=30000),
+    )
+
+
+def test_parkway_between_plazas_is_a_sourced_zero(pricing: PricingData) -> None:
+    parkway = pricing.barrier_tolls[0]
+    line = costs.barrier_toll(metropark_home_on_parkway("130B-A"), parkway, THU_5_30PM, "ezpass")
+
+    assert line is not None
+    assert line.amount == 0 and line.provenance is Provenance.SCHEDULED
+    assert "no toll plaza passed" in line.note
+
+
+def test_parkway_beyond_the_plazas_in_data_is_unknown(pricing: PricingData) -> None:
+    parkway = pricing.barrier_tolls[0]
+    line = costs.barrier_toll(metropark_home_on_parkway("117"), parkway, THU_5_30PM, "ezpass")
+
+    assert line is not None
+    assert line.amount is None and line.provenance is Provenance.UNKNOWN
+
+
+def test_parkway_plaza_passed_in_its_direction_is_charged(pricing: PricingData) -> None:
+    parkway = pricing.barrier_tolls[0].model_copy(update={"covered_mileposts": (120.0, 142.5)})
+    raritan = next(p for p in parkway.plazas if p.direction == "southbound")
+    line = costs.barrier_toll(metropark_home_on_parkway("123"), parkway, THU_5_30PM, "ezpass")
+
+    cash = costs.barrier_toll(metropark_home_on_parkway("123"), parkway, THU_5_30PM, "cash")
+
+    assert line is not None and line.amount == raritan.ezpass
+    assert cash is not None and cash.amount is None  # the cash table is not in data

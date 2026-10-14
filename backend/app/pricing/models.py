@@ -74,6 +74,8 @@ class StationFare(StrictModel):
     to_station: str
     fare_zone: int | None = None
     adult_one_way: Money = Field(gt=0)
+    monthly_pass: Money | None = Field(default=None, gt=0)
+    """Unlimited rides between the two stations for a calendar month; None = not in data."""
 
 
 class RailFares(EffectiveDated, Sourced):
@@ -168,6 +170,36 @@ class TicketToll(EffectiveDated, Sourced):
 
     def rate(self, entry: str, exit_: str) -> TicketRate | None:
         return next((r for r in self.rates if r.entry == entry and r.exit == exit_), None)
+
+
+class BarrierInterchange(StrictModel):
+    id: str
+    milepost: float
+    lat: float
+    lon: float
+
+
+class BarrierPlaza(StrictModel):
+    name: str
+    milepost: float
+    direction: Literal["northbound", "southbound", "both"]
+    ezpass: Money = Field(ge=0)
+
+
+class BarrierToll(EffectiveDated, Sourced):
+    """An open toll road priced at fixed barrier plazas (e.g. Garden State Parkway): a trip pays
+    each plaza it passes in that plaza's tolled direction, found by milepost."""
+
+    kind: Literal["barrier_toll"]
+    facility_id: str
+    operator: str
+    road_match: str
+    """Substring of a route step's name or ref that marks the step as on this road."""
+    covered_mileposts: tuple[float, float]
+    """Span where `plazas` is complete and no ramp is tolled; outside it the toll is unknown."""
+    interchanges: tuple[BarrierInterchange, ...]
+    """Entry snapping points, with the milepost each sits at."""
+    plazas: tuple[BarrierPlaza, ...]
 
 
 # --- Parking -----------------------------------------------------------------

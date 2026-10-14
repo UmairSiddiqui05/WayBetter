@@ -1,14 +1,16 @@
-# WayBetter API — contract-first stub (v0.1)
+# WayBetter API — contract-first stub (v0.2)
 # Purpose: lock the JSON shapes so backend and web agents can build in parallel.
 # FastAPI will generate the authoritative spec later; until then, THIS FILE is the
 # contract. Changes require a PROGRESS.md log entry and a version bump here.
 # Rules baked in: display-ready JSON (N-01), provenance on user-facing data (N-02),
 # no client-supplied user identity (N-06), server-issued anonymous sessions (N-05).
+# v0.2.0 (2026-10-14): daily round-trip commute — TripSearchRequest.return_time and
+# RouteOption.round_trip (RoundTrip, Savings). Additive; v0.1 clients ignore them.
 
 openapi: 3.1.0
 info:
   title: WayBetter API
-  version: 0.1.0
+  version: 0.2.0
   description: >
     Park-and-ride decision engine. All routing, scoring, labeling, and explanation
     logic is server-side; clients render these payloads without recomputation.
@@ -232,6 +234,12 @@ components:
           type: [string, "null"]
           format: date-time
           description: Required unless leave_now. Timezone-aware (region config timezone).
+        return_time:
+          type: [string, "null"]
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+          description: >
+            Local "HH:MM" the commuter heads home the same day, for the daily round-trip view.
+            Null = the corridor's default (data, not code). Must be later than the departure.
         allowed_modes:
           type: array
           items: { type: string, enum: [car, transit, walk] }
@@ -334,6 +342,44 @@ components:
         legs:
           type: array
           items: { $ref: "#/components/schemas/RouteLeg" }
+        round_trip:
+          oneOf:
+            - { $ref: "#/components/schemas/RoundTrip" }
+            - { type: "null" }
+          description: The daily commute (morning + trip home); null when no trip home was found
+
+    RoundTrip:
+      type: object
+      description: >
+        Server-computed daily commute (N-01). Once-a-day charges (parking, congestion toll) are
+        counted once; per-trip costs (gas, fares, tolls in each tolled direction) twice.
+      required: [return_summary, return_legs, return_minutes, daily_minutes,
+                 return_cost_breakdown, daily_cost_breakdown, monthly_cost, annual_cost,
+                 savings_vs_drive]
+      properties:
+        return_summary: { type: string }
+        return_legs:
+          type: array
+          items: { $ref: "#/components/schemas/RouteLeg" }
+        return_minutes: { type: number }
+        daily_minutes: { type: number }
+        return_cost_breakdown: { $ref: "#/components/schemas/CostBreakdown" }
+        daily_cost_breakdown: { $ref: "#/components/schemas/CostBreakdown" }
+        monthly_cost: { $ref: "#/components/schemas/MoneyEstimate" }
+        annual_cost: { $ref: "#/components/schemas/MoneyEstimate" }
+        savings_vs_drive:
+          oneOf:
+            - { $ref: "#/components/schemas/Savings" }
+            - { type: "null" }
+
+    Savings:
+      type: object
+      description: Driving all the way minus this option; amount null when either side is unknown
+      required: [daily, monthly, annual]
+      properties:
+        daily: { $ref: "#/components/schemas/MoneyEstimate" }
+        monthly: { $ref: "#/components/schemas/MoneyEstimate" }
+        annual: { $ref: "#/components/schemas/MoneyEstimate" }
 
     TripSearchResponse:
       type: object

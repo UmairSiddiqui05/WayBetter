@@ -154,6 +154,44 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, daily round trip — backend + API v0.2.0):** Costs were
+  one-way while parking is a full-day charge, so the comparison ignored the trip home. Added a
+  daily round-trip view, computed server-side (N-01):
+  - **API contract v0.1.0 → v0.2.0** (`docs/api-spec.yaml` + `backend/app/__init__.py`; additive).
+    New request field `TripSearchRequest.return_time` ("HH:MM", null = corridor default) and new
+    response field `RouteOption.round_trip` (`RoundTrip`: evening legs, evening/daily
+    `CostBreakdown`, `monthly_cost`, `annual_cost`, `savings_vs_drive` as `Savings`
+    daily/monthly/annual). `test_openapi_parity.py` passes. `backend/pyproject.toml` still says
+    0.1.0 (package metadata, not the contract; left alone to avoid an editable reinstall the
+    night before the demo).
+  - **Toll rules (F-13):** the Lincoln Tunnel stays eastbound-only (existing direction check);
+    the NJ Turnpike is charged on the drive home with its own peak windows (by entry time,
+    4:30-6:30 p.m.); the congestion toll is charged once per day (`charged_once_per_day` in the
+    MTA file) so the evening shows $0 with that note; garage/lot parking is counted once. Gas,
+    rail fare and subway fare are paid on both trips.
+  - **Data (F-12, N-09):** Turnpike return rows 16E/15X → 9/8A and interchanges 16E/15X added to
+    `data/tolls/njta_turnpike.yaml`, read from the same NJTA 2026 PDF (grid is symmetric; checked
+    against the existing 9→16E $10.29 and 9→15X $9.42). New `data/tolls/njta_garden_state_parkway.yaml`
+    (`kind: barrier_toll`, NJTA 2026 GSP E-ZPass PDF): the Metropark drive home uses ~1 mi of the
+    Parkway (131→130), which crosses no plaza, so it now prices to a **sourced $0** instead of
+    being silently ignored; Parkway trips outside mileposts 125.5-142.5 report `unknown`.
+    NJ TRANSIT monthly passes added to `data/fares/njt_rail.yaml` from the fare chart PDF already
+    cited there (Hamilton $563, Princeton Jct $549, Metropark $376, Secaucus $152).
+    `data/regions/nyc-metro-demo-corridor.yaml` gains `commute:` (default return 17:30;
+    250 working days/yr = OPM 2026: 261 weekdays − 11 federal holidays, `status: estimated`) and
+    `hub_boarding_buffer_minutes: 5` (estimated).
+  - **Rules in code:** evening P&R = walk/subway to Penn → next scheduled train out → walk to car →
+    drive home. Parking is re-checked against the actual stay (a stay past the lot's longest
+    published tier is `unknown`). Monthly = working days/12 × daily, except rail uses the monthly
+    pass when it beats two tickets a day; annual = 12 × monthly. Monthly/annual/savings are
+    `unknown` (amount null) whenever any daily component is unknown — a partial sum is never
+    presented as a total. Ranking still uses the morning trip (unchanged behaviour).
+  - Files: `backend/app/trips/{service,costs,models,corridor}.py`, `backend/app/pricing/{models,loader}.py`,
+    tests in `test_trip_costs.py`, `test_trip_search.py`, `test_pricing_data.py`
+    (101 → 122 tests). Requirement IDs: F-01, F-12, F-13, F-14, N-01, N-02, N-03, N-09.
+  - **Human spot-check needed (CLAUDE.md):** the new Turnpike rows, the GSP plaza list, and the
+    four monthly pass prices.
+
 - **2026-10-14 — Claude (DEMO SPRINT, CI fix):** CI's backend job failed on every push since
   step 4 (`30e3654`..`39dc873`; 100/101 passed). Cause: `test_unknown_request_fields_are_rejected`
   did not override `get_trip_service`, so FastAPI built the real service, which opens

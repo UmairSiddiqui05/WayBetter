@@ -6,10 +6,12 @@ Every amount comes from a data file (F-12, F-13, F-14); these functions only dec
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.pricing.models import (
+    BarrierToll,
     CrossingToll,
     DataStatus,
     PeakWindows,
@@ -114,6 +116,67 @@ def _snap(point: LatLon, toll: TicketToll) -> str | None:
     if best and haversine_m(point, LatLon(best.lat, best.lon)) <= INTERCHANGE_SNAP_M:
         return best.id
     return None
+
+
+def barrier_toll(
+    route: DriveRoute, toll: BarrierToll, depart: datetime, payment: str
+) -> TollLine | None:
+    """Open road with barrier plazas (Garden State Parkway): pay each plaza passed in its tolled
+    direction. None when the route never uses the road; unknown outside the covered span."""
+    on_road = [
+        i
+        for i, s in enumerate(route.steps)
+        if toll.road_match in s.name or toll.road_match in s.ref
+    ]
+    if not on_road:
+        return None
+    first = on_road[0]
+    point = route.steps[first].location
+    entry = min(
+        toll.interchanges,
+        key=lambda ic: haversine_m(point, LatLon(ic.lat, ic.lon)),
+        default=None,
+    )
+    if entry and haversine_m(point, LatLon(entry.lat, entry.lon)) > INTERCHANGE_SNAP_M:
+        entry = None
+    label = next((s.exits for s in route.steps[first + 1 :] if s.exits), "")
+    number = re.match(r"\d+(\.\d+)?", label)
+    name = toll.road_match
+    lo, hi = toll.covered_mileposts
+    if not entry or not number:
+        return TollLine(
+            toll.facility_id, None, Provenance.UNKNOWN, f"{name}: interchange not identified"
+        )
+    exit_mp = float(number.group())
+    if not (lo <= entry.milepost <= hi and lo <= exit_mp <= hi):
+        return TollLine(
+            toll.facility_id,
+            None,
+            Provenance.UNKNOWN,
+            f"{name} {entry.id} -> {label}: outside the plazas in data",
+        )
+    direction = "southbound" if exit_mp < entry.milepost else "northbound"
+    low, high = sorted((entry.milepost, exit_mp))
+    passed = [
+        p for p in toll.plazas if low < p.milepost < high and p.direction in (direction, "both")
+    ]
+    at = _time_at_step(route, first, depart)
+    trip = f"{name} {entry.id} -> {label} {direction} ({at:%H:%M})"
+    if not passed:
+        return TollLine(
+            toll.facility_id, 0.0, provenance_of(toll.status), f"{trip}, no toll plaza passed"
+        )
+    if payment == "cash":
+        return TollLine(
+            toll.facility_id, None, Provenance.UNKNOWN, f"{trip}: cash rate not in data"
+        )
+    plazas = ", ".join(p.name for p in passed)
+    return TollLine(
+        toll.facility_id,
+        round(sum(p.ezpass for p in passed), 2),
+        provenance_of(toll.status),
+        f"{trip}, E-ZPass at {plazas}",
+    )
 
 
 def crossing_toll(

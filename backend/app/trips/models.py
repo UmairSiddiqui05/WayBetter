@@ -43,6 +43,8 @@ class TripSearchRequest(_Request):
     destination: LatLng
     time_mode: Literal["leave_now", "leave_at", "arrive_by"]
     target_time: datetime | None = None
+    return_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    """Local "HH:MM" the commuter heads home the same day; None = the corridor default."""
     preferences: Preferences = Preferences()
     vehicle_profile: VehicleProfile = VehicleProfile()
 
@@ -103,6 +105,31 @@ class Explanation(BaseModel):
     provenance: Provenance
 
 
+class Savings(BaseModel):
+    """How much less this option costs than driving all the way, per period."""
+
+    daily: MoneyEstimate
+    monthly: MoneyEstimate
+    annual: MoneyEstimate
+
+
+class RoundTrip(BaseModel):
+    """The daily commute: this option's morning trip plus the evening trip home."""
+
+    return_summary: str
+    return_legs: list[RouteLeg]
+    return_minutes: float
+    daily_minutes: float
+    return_cost_breakdown: CostBreakdown
+    """The evening trip alone. Once-a-day charges (parking, congestion toll) show $0 here."""
+    daily_cost_breakdown: CostBreakdown
+    """Morning + evening, each once-a-day charge counted once."""
+    monthly_cost: MoneyEstimate
+    annual_cost: MoneyEstimate
+    savings_vs_drive: Savings | None
+    """None for the drive-all-the-way option itself, or when there is no drive baseline."""
+
+
 class RouteOption(BaseModel):
     route_id: str
     label: str | None
@@ -119,6 +146,8 @@ class RouteOption(BaseModel):
     warnings: list[str]
     explanation: Explanation
     legs: list[RouteLeg]
+    round_trip: RoundTrip | None = None
+    """None when no trip home could be found (e.g. no train after the return time)."""
 
 
 class TripSearchResponse(BaseModel):

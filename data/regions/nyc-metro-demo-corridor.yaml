@@ -10,9 +10,20 @@ assumed_parking_hours: 11      # car parked ~7am, collected ~6pm; decides the pa
 walk_mph: 3.0
 walk_detour_factor: 1.3        # street grid vs straight line
 max_walk_miles: 1.0            # beyond this the last leg is the subway
+hub_boarding_buffer_minutes: 5  # evening: reach Penn, find the track, board (estimated)
 subway:
   access_minutes: 8            # walk to platform + average wait (estimated)
   mph: 12.0                    # average subway speed incl. stops (estimated)
+commute:
+  # Daily round-trip view: morning leg as searched, plus the evening trip home.
+  default_return_time: "17:30"   # leave the destination at 5:30 PM unless the request says otherwise
+  working_days_per_year: 250
+  status: estimated              # a calendar count applied to one commuter (no leave, no remote days)
+  source:
+    name: "OPM 2026 federal holiday schedule: 261 weekdays in 2026 minus 11 holidays, all on weekdays"
+    url: https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/
+    retrieved: 2026-10-14
+    notes: 250 / 12 = 20.8 working days a month. Derived, not stated by OPM.
 origins:
   - {id: princeton, label: "Princeton (Nassau St)", lat: 40.3500, lng: -74.6597}
   - {id: lawrenceville, label: "Lawrenceville (Business Rte 206)", lat: 40.2968, lng: -74.7296}

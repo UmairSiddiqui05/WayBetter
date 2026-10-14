@@ -37,7 +37,7 @@ def test_every_kind_of_price_file_is_present(pricing: PricingData) -> None:
     assert pricing.rail_fares and pricing.flat_fares
     assert pricing.crossing_tolls and pricing.zone_tolls
     assert pricing.parking_lots and pricing.destination_parking
-    assert pricing.vehicle_defaults and pricing.ticket_tolls
+    assert pricing.vehicle_defaults and pricing.ticket_tolls and pricing.barrier_tolls
 
 
 def test_all_price_files_are_in_effect_on_the_demo_day(pricing: PricingData) -> None:
@@ -130,3 +130,19 @@ def test_a_malformed_file_fails_loudly(nyc: RegionConfig, tmp_path: Path) -> Non
     )
     with pytest.raises(PricingDataError):
         load_pricing_data(broken)
+
+
+def test_monthly_passes_come_from_the_same_sourced_fare_chart(pricing: PricingData) -> None:
+    for table in pricing.rail_fares:
+        for fare in table.fares:
+            assert fare.monthly_pass is not None and table.source.url
+            assert fare.monthly_pass > fare.adult_one_way
+
+
+def test_working_days_are_sourced_and_marked_estimated() -> None:
+    from app.trips.corridor import load_corridor
+
+    corridor = load_corridor(REPO_ROOT / "data" / "regions" / "nyc-metro-demo-corridor.yaml")
+
+    assert corridor.commute.status is DataStatus.ESTIMATED  # a calendar count, not a timetable
+    assert corridor.commute.source.url

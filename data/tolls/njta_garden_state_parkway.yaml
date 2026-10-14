@@ -1,0 +1,32 @@
+# Garden State Parkway — Class 1 passenger cars, E-ZPass. Unlike the Turnpike, the Parkway is
+# tolled at fixed barrier plazas (some one-direction only) and a few ramps. A trip pays every
+# plaza it passes in the tolled direction, found by milepost between entry and exit.
+# Ramp tolls are charged only to cars using that ramp, so they are not modelled; instead the
+# data covers mileposts 125.5-142.5, a span with no tolled ramps (Sayreville SX ramp is at 125.0,
+# Union NB entrance ramp at 142.8). A Parkway trip entering or leaving outside it is `unknown`.
+kind: barrier_toll
+facility_id: garden_state_parkway
+operator: New Jersey Turnpike Authority
+road_match: Garden State Parkway
+currency: USD
+effective_from: 2026-01-01
+effective_to: 2026-12-31
+status: scheduled
+human_verified: false
+source:
+  name: NJTA "2026 Toll Rates, E-ZPass, Garden State Parkway" (Plaza/Ramps table, Class 1)
+  url: https://www.njta.gov/document/2026-parkway-nj-e-zpass-rates/
+  index_url: https://www.njta.gov/toll-schedules-garden-state-parkway/
+  retrieved: 2026-10-14
+  notes: >
+    Plaza names, mileposts and directions read from the PDF. Passenger cars pay the same rate at
+    all hours (the PDF's off-peak discount is for heavy trucks only). Cash rates are a separate
+    PDF and not entered, so a cash trip through a plaza is `unknown`. Parkway interchanges are
+    numbered by milepost; the entry point below is where the routing engine merges onto the
+    Parkway at Metropark (OSM geometry).
+covered_mileposts: [125.5, 142.5]
+interchanges:
+  - {id: "131", milepost: 131.0, lat: 40.5706, lon: -74.3283}
+plazas:   # main-line barriers bounding the covered span
+  - {name: "Union (main line)", milepost: 142.7, direction: northbound, ezpass: 2.25}
+  - {name: "Raritan (main line)", milepost: 125.4, direction: southbound, ezpass: 2.25}

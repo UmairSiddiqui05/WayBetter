@@ -21,14 +21,23 @@ source:
     Values read from the PDF grid (entry row x exit column). "NJ E-ZPass Off-Peak" applies to
     New Jersey-issued E-ZPass only; out-of-state E-ZPass pays the E-ZPass (peak) rate all day.
     effective_from is assumed Jan 1 (schedule titled "2026"; the PDF prints no date).
+    Return-direction rows (16E/15X -> 9/8A) added 2026-10-14 from the same PDF for the daily
+    round-trip view; the grid is symmetric (e.g. 9->16E and 16E->9 are both $10.29 E-ZPass).
 peak_windows:   # based on time of ENTRY
   weekday: [["07:00", "09:00"], ["16:30", "18:30"]]
   weekend: [["00:00", "24:00"]]
 interchanges:   # entry snapping points (OSM geometry via the routing engine), snap radius 3 km
   - {id: "8A", name: "NJ 32, Cranbury/Jamesburg", lat: 40.3550, lon: -74.4711}
   - {id: "9", name: "NJ 18, New Brunswick", lat: 40.4808, lon: -74.4026}
+  - {id: "15X", name: "Secaucus Transfer", lat: 40.7590, lon: -74.0828}
+  - {id: "16E", name: "NJ 495, Lincoln Tunnel", lat: 40.7741, lon: -74.0603}
 rates:
   - {entry: "9",  exit: "16E", ezpass_peak: 10.29, nj_ezpass_off_peak: 7.72, cash: 10.40}
   - {entry: "9",  exit: "15X", ezpass_peak: 9.42,  nj_ezpass_off_peak: 7.07, cash: 9.55}
   - {entry: "8A", exit: "16E", ezpass_peak: 11.45, nj_ezpass_off_peak: 8.59, cash: 11.55}
   - {entry: "8A", exit: "15X", ezpass_peak: 10.70, nj_ezpass_off_peak: 8.02, cash: 10.80}
+  # Evening drive home (southbound)
+  - {entry: "16E", exit: "9",  ezpass_peak: 10.29, nj_ezpass_off_peak: 7.72, cash: 10.40}
+  - {entry: "16E", exit: "8A", ezpass_peak: 11.45, nj_ezpass_off_peak: 8.59, cash: 11.55}
+  - {entry: "15X", exit: "9",  ezpass_peak: 9.42,  nj_ezpass_off_peak: 7.07, cash: 9.55}
+  - {entry: "15X", exit: "8A", ezpass_peak: 10.70, nj_ezpass_off_peak: 8.02, cash: 10.80}

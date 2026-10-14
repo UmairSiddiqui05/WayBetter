@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.pricing.models import Sourced
 from app.providers.base import LatLon
 
 
@@ -34,6 +35,14 @@ class SubwayAssumptions(_Strict):
     mph: float = Field(gt=0)
 
 
+class CommuteAssumptions(Sourced):
+    """Daily round-trip view: when the commuter heads home, and how many days a year they
+    commute (for the monthly and annual figures)."""
+
+    default_return_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    working_days_per_year: int = Field(gt=0, le=366)
+
+
 class Corridor(_Strict):
     corridor_id: str
     name: str
@@ -43,7 +52,9 @@ class Corridor(_Strict):
     walk_mph: float = Field(gt=0)
     walk_detour_factor: float = Field(ge=1)
     max_walk_miles: float = Field(ge=0)
+    hub_boarding_buffer_minutes: float = Field(ge=0)
     subway: SubwayAssumptions
+    commute: CommuteAssumptions
     origins: tuple[Place, ...]
     destinations: tuple[Place, ...]
 

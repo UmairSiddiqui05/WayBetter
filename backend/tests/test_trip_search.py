@@ -15,7 +15,13 @@ from app.regions import load_region_config
 from app.regions.loader import REPO_ROOT
 from app.trips.corridor import load_corridor
 from app.trips.factory import get_trip_service
-from app.trips.models import TripSearchRequest
+from app.trips.models import (
+    Provenance,
+    RoundTrip,
+    RouteOption,
+    TripSearchRequest,
+    TripSearchResponse,
+)
 from app.trips.service import Station, TripSearchError, TripSearchService
 
 NY = ZoneInfo("America/New_York")
@@ -44,6 +50,21 @@ class FakeDriving:
                 DriveStep("10th Avenue", "", "", "turn", LatLon(40.7596, -73.9955), 500),
             )
             return DriveRoute(80 * 60, 45000, "", steps)
+        if origin.lon > -74.0:  # home from Manhattan: tunnel westbound, Turnpike 16E -> 9
+            steps = (
+                DriveStep("Lincoln Tunnel", "NY 495", "", "merge", LatLon(40.7589, -73.9992), 2500),
+                DriveStep(
+                    "New Jersey Turnpike Eastern Spur",
+                    "I 95; NJTP",
+                    "",
+                    "merge",
+                    LatLon(40.7741, -74.0603),
+                    40000,
+                ),
+                DriveStep("", "", "9", "off ramp", LatLon(40.4861, -74.3992), 2000),
+                DriveStep("Nassau Street", "NJ 27", "", "turn", LatLon(40.3504, -74.6571), 500),
+            )
+            return DriveRoute(78 * 60, 45000, "", steps)
         return DriveRoute(30 * 60, 32000, "", ())
 
 
@@ -224,3 +245,189 @@ def test_page_assets_are_local_so_the_demo_runs_offline(app: FastAPI) -> None:
         "/static/basemap-ny-nj-ct.geojson",
     ):
         assert client.get(path).status_code == 200, path
+
+
+# -- daily round trip --------------------------------------------------------------------
+
+
+def by_id(response: TripSearchResponse) -> dict[str, RouteOption]:
+    return {r.route_id: r for r in response.routes}
+
+
+def round_trip(option: RouteOption) -> RoundTrip:
+    assert option.round_trip is not None
+    return option.round_trip
+
+
+def test_every_option_gets_a_trip_home_at_the_corridor_default(
+    service: TripSearchService,
+) -> None:
+    default = service.corridor.commute.default_return_time
+    for r in service.search(request(), NOW).routes:
+        home = round_trip(r)
+        assert home.return_legs[0].start_time.strftime("%H:%M") == default
+        assert home.daily_minutes == pytest.approx(r.total_minutes + home.return_minutes, abs=0.2)
+
+
+def test_a_requested_return_time_overrides_the_default(service: TripSearchService) -> None:
+    for r in service.search(request(return_time="19:15"), NOW).routes:
+        assert round_trip(r).return_legs[0].start_time.strftime("%H:%M") == "19:15"
+
+
+def test_return_before_departure_is_rejected(service: TripSearchService) -> None:
+    with pytest.raises(TripSearchError, match="return_time"):
+        service.search(request(return_time="06:30"), NOW)
+
+
+def test_drive_home_pays_the_turnpike_but_not_the_tunnel_or_a_second_congestion_toll(
+    service: TripSearchService,
+) -> None:
+    drive = round_trip(by_id(service.search(request(), NOW))["drive"])
+    evening = drive.return_cost_breakdown
+
+    assert "16E -> 9" in (evening.tolls.note or "")
+    assert "Lincoln" not in (evening.tolls.note or "")  # tolled entering New York only
+    assert evening.congestion_fee.amount == 0  # charged once per day
+    assert evening.parking.amount == 0  # the garage day rate was paid in the morning
+
+
+def test_daily_cost_counts_once_a_day_charges_once_and_per_trip_costs_twice(
+    service: TripSearchService,
+) -> None:
+    for r in service.search(request(), NOW).routes:
+        morning, home = r.cost_breakdown, round_trip(r)
+        evening, daily = home.return_cost_breakdown, home.daily_cost_breakdown
+        assert daily.parking.amount == morning.parking.amount
+        assert daily.congestion_fee.amount == morning.congestion_fee.amount
+        for part in ("gas_or_ev", "transit_fare", "tolls"):
+            m, e, d = (getattr(b, part).amount for b in (morning, evening, daily))
+            assert d == pytest.approx(m + e, abs=0.01), (r.route_id, part)
+        assert daily.total == pytest.approx(morning.total + evening.total, abs=0.01)
+
+
+def test_rail_fare_is_paid_both_ways(service: TripSearchService) -> None:
+    pnr = by_id(service.search(request(), NOW))["pnr-metropark-decks"]
+    home = round_trip(pnr)
+
+    assert home.return_cost_breakdown.transit_fare.amount == pnr.cost_breakdown.transit_fare.amount
+    assert home.return_legs[1].mode == "transit"
+
+
+def test_monthly_cost_uses_the_monthly_pass_when_it_beats_tickets(
+    service: TripSearchService,
+) -> None:
+    region = load_region_config("data/regions/nyc-metro.yaml")
+    fare = next(
+        f
+        for t in load_pricing_data(region).rail_fares
+        for f in t.fares
+        if f.from_station == "nyc-metro:njt_rail:metropark"
+    )
+    assert fare.monthly_pass is not None
+    days = service.corridor.commute.working_days_per_year / 12
+    home = round_trip(by_id(service.search(request(), NOW))["pnr-metropark-decks"])
+
+    tickets = home.daily_cost_breakdown.total * days
+    with_pass = (
+        home.daily_cost_breakdown.total - 2 * fare.adult_one_way
+    ) * days + fare.monthly_pass
+    assert with_pass < tickets
+    assert home.monthly_cost.amount == pytest.approx(with_pass, abs=0.01)
+    assert home.annual_cost.amount == pytest.approx(12 * with_pass, abs=0.12)
+    assert "monthly pass" in (home.monthly_cost.note or "")
+    assert home.monthly_cost.provenance is Provenance.ESTIMATED  # working days are estimated
+
+
+def test_savings_are_driving_minus_the_option_for_each_period(
+    service: TripSearchService,
+) -> None:
+    routes = by_id(service.search(request(), NOW))
+    drive = round_trip(routes["drive"])
+    assert drive.savings_vs_drive is None
+    for route_id, r in routes.items():
+        if route_id == "drive":
+            continue
+        mine = round_trip(r)
+        saved = mine.savings_vs_drive
+        assert saved is not None
+        assert saved.daily.amount == pytest.approx(
+            drive.daily_cost_breakdown.total - mine.daily_cost_breakdown.total, abs=0.01
+        )
+        assert drive.monthly_cost.amount is not None and mine.monthly_cost.amount is not None
+        assert saved.monthly.amount == pytest.approx(
+            drive.monthly_cost.amount - mine.monthly_cost.amount, abs=0.01
+        )
+        assert "a day" in r.explanation.text
+
+
+def test_unknown_daily_cost_leaves_month_year_and_savings_unknown(
+    service: TripSearchService,
+) -> None:
+    elsewhere = {"lat": 40.7300, "lng": -73.9950}  # no garage price, zone membership unknown
+    routes = by_id(service.search(request(destination=elsewhere), NOW))
+    drive = round_trip(routes["drive"])
+
+    assert drive.monthly_cost.amount is None
+    assert drive.monthly_cost.provenance is Provenance.UNKNOWN
+    saved = round_trip(routes["pnr-metropark-decks"]).savings_vs_drive
+    assert saved is not None and saved.monthly.amount is None
+
+
+def test_a_stay_past_the_lots_longest_rate_is_unknown_not_guessed(
+    service: TripSearchService,
+) -> None:
+    secaucus = by_id(service.search(request(return_time="23:30"), NOW))[
+        "pnr-secaucus-junction-parkfast"
+    ]
+    home = round_trip(secaucus)
+
+    assert home.return_cost_breakdown.parking.amount is None  # only a 12 h rate is in data
+    assert home.monthly_cost.amount is None
+
+
+class NoTrainHome(FakeTransit):
+    def next_trip(
+        self, from_station: str, to_station: str, depart_after: datetime
+    ) -> TransitTrip | None:
+        return (
+            None
+            if from_station == PENN
+            else super().next_trip(from_station, to_station, depart_after)
+        )
+
+
+def test_no_train_home_means_no_round_trip_and_says_why(service: TripSearchService) -> None:
+    region = load_region_config("data/regions/nyc-metro.yaml")
+    stations = {sid: Station(sid, sid.rsplit(":", 1)[1].upper(), p) for sid, p in LOTS.items()}
+    stations[PENN] = Station(PENN, "NEW YORK PENN STATION", LatLon(40.7506, -73.9935))
+    stranded = TripSearchService(
+        region=region,
+        corridor=service.corridor,
+        pricing=load_pricing_data(region),
+        stations=stations,
+        driving=FakeDriving(),
+        transit=NoTrainHome(),
+    )
+    routes = by_id(stranded.search(request(), NOW))
+
+    assert routes["drive"].round_trip is not None
+    pnr = routes["pnr-metropark-decks"]
+    assert pnr.round_trip is None
+    assert any("No scheduled train" in w for w in pnr.warnings)
+
+
+def test_api_returns_the_round_trip_and_validates_return_time(
+    app: FastAPI, service: TripSearchService
+) -> None:
+    app.dependency_overrides[get_trip_service] = lambda: service
+    client = TestClient(app)
+    headers = {"X-Session-Token": client.post("/api/v1/session").json()["session_token"]}
+    body = request().model_dump(mode="json")
+
+    ok = client.post("/api/v1/trip/search", json={**body, "return_time": "18:00"}, headers=headers)
+    bad = client.post("/api/v1/trip/search", json={**body, "return_time": "25:00"}, headers=headers)
+    app.dependency_overrides.clear()
+
+    assert ok.status_code == 200
+    assert all(r["round_trip"]["monthly_cost"]["provenance"] for r in ok.json()["routes"])
+    assert bad.status_code == 422
