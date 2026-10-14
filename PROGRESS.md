@@ -78,6 +78,10 @@ The single source of truth for **what is done, what is in progress, and what com
 - [ ] App Store submission
 
 ## Backlog / discovered
+- **Send total statuses from the server (N-02):** `CostBreakdown.total` and `RouteOption.total_minutes`
+  carry no provenance, so the demo page rolls up the parts' statuses for display. Add
+  `total_provenance` (and a minutes status) in the next API version so the client renders it
+  instead (found 2026-10-14 during the page redesign).
 - **A1 → A3 handoff:** `backend/tests/test_openapi_parity.py` currently asserts the generated
   schema is a *subset* of docs/api-spec.yaml (A1 ships zero contract endpoints). When A3
   finishes wiring, flip `test_contract_coverage_report` to assert set equality so a dropped
@@ -153,6 +157,44 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT, calmer page redesign — human-approved scope extension, page only):**
+  Safety tag `demo-safe-1014-roundtrip` pushed on the pre-redesign main. The page
+  (`backend/app/web/index.html`) is now a Google-Maps-style layout: a search card (From / To with
+  swap, Leave at, settings chips, an empty `id="ask"` slot reserved for the natural-language input),
+  then compact ranked rows (badges, name, ONE number, a time bar built from the server's legs with
+  the gaps between legs drawn as waiting, one meta line). A row opens a detail view: badges, the
+  server's "why", one-trip / per-day / per-month tiles, morning steps, evening trip (expandable),
+  the daily cost breakdown with a "Split by trip" Morning / Home / Day expander (notes kept there),
+  month / year / savings and the monthly-pass note, and collapsible warnings. Sort tabs render from
+  `response.sort_options` and re-request with `preferences.sort_mode` (ranking stays server-side);
+  the Trip / Day / Month toggle only picks which server field a row shows. A menu drawer holds Plan
+  a trip, Settings (head-home time + E-ZPass/cash, saved in localStorage with every access in
+  try/catch; sent as `return_time` / `vehicle_profile.toll_payment`, both already in the contract),
+  Data sources, and About and limitations (server disclaimers moved there; one-line footer).
+  Provenance is a small icon with an accessible label and tooltip, one legend line, and full words
+  in the detail view. Map behaviour unchanged except grey tiles (CSS filter on the tile pane only).
+  Vendored for offline: Public Sans variable woff2 (`static/fonts/`, OFL) and a 30-icon Lucide
+  v1.48.0 subset as one SVG sprite (`static/icons/`, ISC). `page.py` now also injects the data-source
+  list (category, name, source, URL, retrieved, status, human_verified) from the pricing loader,
+  the corridor file and the GTFS feed metadata — no new API path, no API change.
+  New tests: `backend/tests/test_web_page.py` (data sources injected with status/date/URL, no `$`
+  literals and no hard-coded sort modes in the page, scripts/fonts/icons local, every icon used
+  exists in the sprite, the `ask` slot exists). `make check` green (128 tests).
+  **Verified in the browser:** Princeton → Times Square, Thu 10/15 7:00 AM, home 5:30 PM matches
+  DEMO.md section 3 for every row in Trip / Day / Month (one-way, day, month, saves/month, minutes,
+  trains) and the Drive breakdown line by line; head home 7:15 PM gives $47.74/day saved; Scenario B
+  matches; cash tolls re-request works; settings reset works and the page works with localStorage
+  throwing; 375 px wide has no sideways scroll; no console errors; the network-blocked
+  `waybetter-api-offline` (port 8001, `?offline`) renders with zero non-local requests.
+  **Deviations / notes:** (a) The API sends `CostBreakdown.total` and `total_minutes` without a
+  status, so the page shows the least certain status of the parts beside them (a display roll-up of
+  server labels, commented in the page) — see backlog. (b) Swap exchanges the two preset lists; a
+  reversed trip (Manhattan → suburb) returns drive-only with parking and congestion toll honestly
+  *unknown*, because the corridor models inbound park-and-ride only. (c) DEMO.md still describes the
+  old cards and the Rank-by dropdown; left for the chat that owns DEMO.md.
+  Files: `backend/app/web/{index.html,page.py}`, `backend/app/web/static/{fonts,icons}/`,
+  `backend/tests/test_web_page.py`. Requirements: F-18, N-01, N-02, N-09.
 
 - **2026-10-14 — Claude (DEMO SPRINT, daily round trip — page, cache, DEMO.md, verification):**
   Cards now show **one-way vs round trip / day** side by side, a Morning | Home | Day cost table
