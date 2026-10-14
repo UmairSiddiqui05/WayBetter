@@ -2,7 +2,7 @@
   "feed_id": "mta_lirr",
   "agency_name": "Long Island Rail Road",
   "source_url": "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip",
-  "retrieved_at": "2026-10-14T19:23:42.330674+00:00",
+  "retrieved_at": "2026-10-14T20:02:29.879507+00:00",
   "sha256": "7d7c3a1bff8df871fced32f88ab107c9e2463128eb16c63ef46b49390e94766b",
   "size_bytes": 1714389,
   "feed_version": "GO202_26",

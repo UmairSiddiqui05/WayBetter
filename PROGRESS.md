@@ -15,7 +15,8 @@ The single source of truth for **what is done, what is in progress, and what com
 ## In progress
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
-  **Metro-North Harlem Line → Grand Central** (human, no NJT portal access). Steps 1–2 done.
+  **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
+  access arrived, 2026-10-14). Steps 1–2 done; NJT rail feed ingested.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -152,6 +153,21 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT, NJT feed ingested + corridor):** Human switched the demo
+  corridor to **NJ Transit Northeast Corridor → New York Penn Station** and entered their portal
+  login in `.env` themselves. **Surprise:** production `getToken` answers HTTP 500
+  `{"errorMessage": "Missing user account."}`; the same login authenticates on
+  **`testraildata.njtransit.com`**, so both NJT URLs in `nyc-metro.yaml` point at the test host
+  (comment says how to flip back once NJT provisions production). Feed: 6.3 MB, validates clean,
+  230 stations, agencies `NJT` + `NJB`, service calendar 2026-10-01 → 2027-03-29, 113 NEC trips
+  on 2026-10-15. **No `fare_attributes`/`fare_rules` in the feed** — rail fares must come from
+  NJ TRANSIT's published fare tables (human spot-check required). Station map rebuilt: 967
+  stations (230 NJT). AM-peak (arrive NY Penn 07:00–09:30, 10/15) ride times from the feed:
+  Hamilton 60–66 min, Princeton Jct 53–80 (express vs local), New Brunswick 50–53, Metuchen
+  41–44, Metropark 36–38, Secaucus Upper Level 12–13. Files: `data/regions/nyc-metro.yaml`,
+  `data/regions/nyc-metro-stations.csv`, `data/gtfs/*.meta.json` (new `njt_rail.meta.json`).
+  IDs: N-08, N-09.
 
 - **2026-10-14 — Claude (DEMO SPRINT, NJ Transit feed wiring):** Human got NJT developer-portal
   access (GTFS-RAIL, GTFS-BUS, RailData, BUSDATA all *Active*) — B-3 partly resolved. Claude in

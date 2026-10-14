@@ -118,6 +118,7 @@ feeds:
 
   - feed_id: njt_rail
     agency_name: NJ Transit Rail
+    agency_ids: ["NJB", "NJT"]
     modes: [commuter_rail]
     format: gtfs
     requires_credentials: true
@@ -125,9 +126,12 @@ feeds:
     # Endpoints from NJ TRANSIT's published spec,
     # https://raildata.njtransit.com/swagger/GTFS/swagger.json (read 2026-10-14):
     # POST getToken (username, password) -> {"UserToken": ...}; POST getGTFS (token) -> zip.
-    url: https://raildata.njtransit.com/api/GTFSRT/getGTFS
+    # TEST host: the account authenticates on testraildata but production answers
+    # "Missing user account." (2026-10-14). Switch both URLs to raildata.njtransit.com
+    # once NJ TRANSIT provisions production access.
+    url: https://testraildata.njtransit.com/api/GTFSRT/getGTFS
     auth:
-      token_url: https://raildata.njtransit.com/api/GTFSRT/getToken
+      token_url: https://testraildata.njtransit.com/api/GTFSRT/getToken
       username_field: username
       password_field: password
       token_response_field: UserToken

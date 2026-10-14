@@ -2,7 +2,7 @@
   "feed_id": "mta_subway",
   "agency_name": "MTA New York City Transit",
   "source_url": "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",
-  "retrieved_at": "2026-10-14T19:23:42.074977+00:00",
+  "retrieved_at": "2026-10-14T20:02:29.627009+00:00",
   "sha256": "2c9e69b82ac596a2fe660b56656509570cfba3c2e4c50be75eaf624eee1bc6f8",
   "size_bytes": 5615228,
   "feed_version": "20260826-X-long-term-supplement-trip-ids",

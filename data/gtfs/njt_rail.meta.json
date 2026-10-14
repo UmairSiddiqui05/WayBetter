@@ -1,0 +1,22 @@
+{
+  "feed_id": "njt_rail",
+  "agency_name": "NJ Transit Rail",
+  "source_url": "https://testraildata.njtransit.com/api/GTFSRT/getGTFS",
+  "retrieved_at": "2026-10-14T20:02:30.650852+00:00",
+  "sha256": "9d6cb286034d0e13fb4d3a82c99034e3edf571af7d3ea41ef2f08ab091fadb0c",
+  "size_bytes": 6649626,
+  "feed_version": "sha256:9d6cb286034d0e13",
+  "license_name": "NJ TRANSIT Developer Portal Terms",
+  "license_url": "https://developer.njtransit.com",
+  "license_verified": false,
+  "attribution": null,
+  "agency_ids": [
+    "NJB",
+    "NJT"
+  ],
+  "validation_errors": [],
+  "validation_warnings": [
+    "no calendar.txt \u2014 service comes entirely from calendar_dates.txt (normal for LIRR/Metro-North; holiday and weekend fixtures depend on it)",
+    "no feed_info.txt \u2014 feed publishes no feed_version; falling back to a content hash"
+  ]
+}
