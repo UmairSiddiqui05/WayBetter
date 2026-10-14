@@ -30,3 +30,6 @@ data/otp-graphs/*
 
 # iOS
 ios/**/xcuserdata/
+
+# Provider response caches (OSRM)
+data/cache/

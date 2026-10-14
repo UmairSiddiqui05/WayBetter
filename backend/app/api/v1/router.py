@@ -17,4 +17,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.api.v1 import session, trip
+
 api_router = APIRouter()
+api_router.include_router(session.router)
+api_router.include_router(trip.router)

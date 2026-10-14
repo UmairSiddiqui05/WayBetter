@@ -5,14 +5,14 @@ effective_from: 2026-10-14
 effective_to: null
 areas:
   - area_id: midtown-manhattan
-    name: Midtown Manhattan garage, weekday daytime
-    status: unknown
+    name: Midtown Manhattan garage (164 W 46th St / 1540 Broadway valet), 12 hours
+    status: estimated
     human_verified: false
-    daily_usd: null   # unknown stays unknown (N-02)
+    daily_usd: 33.92
     source:
-      url: null
+      url: https://spothero.com
       retrieved: 2026-10-14
       notes: >
-        No current official or public-report figure found (latest public Colliers survey
-        median is from 2011). HUMAN: enter the posted weekday daily rate of a specific garage
-        near the demo destination, with its URL.
+        Human-entered 2026-10-14 from a SpotHero reservation quote for this garage: $33.92 total
+        for 12 hours, but for Oct 15 9:00 PM - Oct 16 9:00 AM (overnight). Weekday daytime
+        rates are typically higher, so the drive-all-the-way cost is understated, not inflated.

@@ -64,13 +64,15 @@ lots:
     operator: LAZ at Edison ParkFast (Edison Properties)
     address: 650 New County Road, Secaucus, NJ
     capacity: 1482
-    status: unknown
+    status: estimated
     human_verified: false
-    rate_tiers: []   # unknown stays unknown (N-02) — never fabricate a plausible price
+    rate_tiers:
+      - {max_hours: 12, usd: 30.00}
     source:
       url: https://www.njtransit.com/station/secaucus-junction-station
       operator_url: https://go.lazparking.com/buynow?l=197687
       retrieved: 2026-10-14
       notes: >
-        NJ TRANSIT lists no daily rate ("Check website for current pricing"); the operator's
-        booking page refused automated access (HTTP 403). HUMAN: enter the weekday daily rate.
+        Human-entered 2026-10-14 from a search summary citing LAZ and r/newjersey: weekday
+        drive-up "around $30" up to 12 hours; longer stays "$60+" (not modelled -> unknown).
+        Not confirmed on the operator's own page (it refused automated access, HTTP 403).

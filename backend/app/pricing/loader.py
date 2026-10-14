@@ -15,6 +15,7 @@ from app.pricing.models import (
     FlatFare,
     ParkingLots,
     RailFares,
+    TicketToll,
     VehicleDefaults,
     ZoneToll,
 )
@@ -25,6 +26,7 @@ PriceFile = Annotated[
     RailFares
     | FlatFare
     | CrossingToll
+    | TicketToll
     | ZoneToll
     | ParkingLots
     | DestinationParking
@@ -44,6 +46,7 @@ class PricingData:
     flat_fares: list[FlatFare] = field(default_factory=list)
     crossing_tolls: list[CrossingToll] = field(default_factory=list)
     zone_tolls: list[ZoneToll] = field(default_factory=list)
+    ticket_tolls: list[TicketToll] = field(default_factory=list)
     parking_lots: list[ParkingLots] = field(default_factory=list)
     destination_parking: list[DestinationParking] = field(default_factory=list)
     vehicle_defaults: list[VehicleDefaults] = field(default_factory=list)
@@ -71,6 +74,8 @@ def load_pricing_data(region: RegionConfig) -> PricingData:
                     data.crossing_tolls.append(item)
                 case ZoneToll() as item:
                     data.zone_tolls.append(item)
+                case TicketToll() as item:
+                    data.ticket_tolls.append(item)
                 case ParkingLots() as item:
                     data.parking_lots.append(item)
                 case DestinationParking() as item:

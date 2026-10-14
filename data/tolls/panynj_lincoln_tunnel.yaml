@@ -4,19 +4,20 @@ kind: crossing_toll
 facility_id: lincoln_tunnel
 operator: Port Authority of New York and New Jersey
 direction_tolled: into_new_york
+route_match_names: ["Lincoln Tunnel"]
 currency: USD
-effective_from: 2026-01-04
+effective_from: 2026-07-01
 effective_to: null
 status: scheduled
-human_verified: false
+human_verified: true
 source:
-  name: PANYNJ toll schedule for Hudson River crossings (effective 2026-01-04)
+  name: PANYNJ "July 2026 Toll Rates" (Class 1, two axles)
   url: https://www.panynj.gov/bridges-tunnels/en/tolls.html
   retrieved: 2026-10-14
   notes: >
-    The official page renders its table with JavaScript and could not be read by the agent.
-    Figures are from secondary sources citing the PANYNJ tariff (Wikipedia "Lincoln Tunnel").
-    HUMAN MUST CONFIRM on panynj.gov before the demo.
+    Confirmed by the human from the PANYNJ July 2026 toll rate sheet on 2026-10-14:
+    off-peak $14.79, peak $16.79, Tolls by Mail $23.30, "TOLLS ARE COLLECTED ONLY ENTERING
+    NEW YORK"; peak = weekdays 6-10 a.m. and 4-8 p.m., Sat & Sun 11 a.m.-9 p.m.
 rates:
   ezpass_peak: 16.79
   ezpass_off_peak: 14.79

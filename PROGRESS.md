@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). Steps 1–3 done (step 3: two prices `unknown`, awaiting human).
+  access arrived, 2026-10-14). Steps 1–4 done: `POST /trip/search` returns a real comparison (2026-10-14 ~17:45 ET).
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,33 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 4, providers + trip search):** `POST /api/v1/session`
+  and `POST /api/v1/trip/search` live, both already in docs/api-spec.yaml (no contract change, no
+  version bump). **Providers behind interfaces (N-04):** `app/providers/base.py` protocols;
+  `osrm.py` (public OSRM demo server, 10 s timeout, on-disk cache under gitignored
+  `data/cache/osrm/`); `gtfs_transit.py` (reads the NJT zip directly: calendar/calendar_dates,
+  after-midnight times, pickup/drop-off flags; picks the trip that *arrives first*, so a later
+  express beats an earlier local; shapes loaded lazily per trip). **Trip service**
+  (`app/trips/`): drive-all-the-way vs each lot (drive → 7-min park/walk buffer from region config
+  → next train → walk or subway), cost rules in `costs.py` (pure, no literals), ranking
+  (best overall = equal weight to cost and time relative to the best option; fastest; cheapest),
+  server-side labels and a one-line explanation from the computed numbers (N-01).
+  **Tolls:** NJ Turnpike priced from the official NJTA 2026 Class 1 schedule
+  (`data/tolls/njta_turnpike.yaml`; entry snapped to interchange coordinates, exit from the
+  routing engine's posted exit number; unlisted pairs → `unknown`); Lincoln Tunnel eastbound-only,
+  now **human-verified** from the PANYNJ July 2026 sheet; Congestion Relief Zone with the peak
+  tunnel credit. Human-supplied: Secaucus ~$30/12 h and Midtown garage $33.92 (SpotHero quote
+  for an *overnight* window) — both `estimated` with caveats. CRZ membership is a human-checked
+  flag on preset destinations (`data/regions/nyc-metro-demo-corridor.yaml`) because zone polygons
+  are still unsourced (B-5); non-preset destinations report the fee as `unknown`.
+  **Verified end-to-end** against the real feed + OSRM: Princeton → Times Square, Thu 07:00 —
+  Metropark $27.60/115 min (best overall, cheapest), Princeton Jct $32.11/113, Hamilton $34.49/113,
+  Secaucus $53.04/126, drive $76.17/82 (Turnpike 9→16E $10.29 + Lincoln $16.79 + CRZ $6 + garage
+  $33.92 + gas $9.17). 99 tests, ruff, mypy strict green. IDs: F-01, F-02, F-03, F-12, F-13, F-14,
+  N-01, N-02, N-03, N-04, N-05, N-06.
+  **Not done / caveats:** drive times are free-flow (no traffic); `arrive_by` returns 422;
+  `/readyz` still 503 without Postgres/Redis; prices still need the human spot-check.
 
 - **2026-10-14 — Claude (DEMO SPRINT step 3, price data):** Effective-dated YAML price files,
   each with source URL + retrieval date + `status` + `human_verified: false` (F-12, F-13, F-14,

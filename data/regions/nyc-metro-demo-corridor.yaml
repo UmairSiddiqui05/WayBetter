@@ -1,0 +1,32 @@
+# Demo-sprint corridor (D-18): which park-and-ride lots to compare, where the train goes,
+# and the preset places the demo page offers. Facts about places (e.g. "inside the
+# Congestion Relief Zone") are human-checkable here instead of a polygon test, because
+# the zone polygon is not sourced yet (PROGRESS blocker B-5).
+corridor_id: njt-nec-nyp
+name: NJ TRANSIT Northeast Corridor to New York Penn Station
+transit_feed: njt_rail
+hub_station: nyc-metro:njt_rail:new-york-penn-station
+assumed_parking_hours: 11      # car parked ~7am, collected ~6pm; decides the parking rate tier
+walk_mph: 3.0
+walk_detour_factor: 1.3        # street grid vs straight line
+max_walk_miles: 1.0            # beyond this the last leg is the subway
+subway:
+  access_minutes: 8            # walk to platform + average wait (estimated)
+  mph: 12.0                    # average subway speed incl. stops (estimated)
+origins:
+  - {id: princeton, label: "Princeton (Nassau St)", lat: 40.3500, lng: -74.6597}
+  - {id: lawrenceville, label: "Lawrenceville (Business Rte 206)", lat: 40.2968, lng: -74.7296}
+  - {id: plainsboro, label: "Plainsboro (Scudders Mill Rd)", lat: 40.3330, lng: -74.5946}
+destinations:
+  - id: times-square
+    label: "Times Square (1540 Broadway)"
+    lat: 40.7580
+    lng: -73.9855
+    in_congestion_relief_zone: true   # W 46th St, south of 60th St
+    parking_area: midtown-manhattan
+  - id: bryant-park
+    label: "Bryant Park (6th Ave & W 42nd St)"
+    lat: 40.7540
+    lng: -73.9840
+    in_congestion_relief_zone: true
+    parking_area: midtown-manhattan

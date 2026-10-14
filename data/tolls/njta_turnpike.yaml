@@ -1,0 +1,33 @@
+# New Jersey Turnpike — Class 1 passenger cars (2 axles). Toll depends on entry and exit
+# interchange, so the trip service detects both on the driving route:
+#  - exit: the off-ramp's posted exit number (the routing engine returns it, e.g. "16E")
+#  - entry: the merge onto the Turnpike, snapped to the nearest interchange below
+# A route whose entry/exit pair is not listed gets toll status `unknown`, never a guess.
+kind: ticket_toll
+facility_id: nj_turnpike
+operator: New Jersey Turnpike Authority
+road_ref_match: NJTP
+currency: USD
+effective_from: 2026-01-01
+effective_to: 2026-12-31
+status: scheduled
+human_verified: false
+source:
+  name: NJTA 2026 Toll Rate Schedule — Class 1 Passenger Cars (2 Axles)
+  url: https://www.njta.gov/document/2026-turnpike-class-1-passenger-cars-2-axles/
+  index_url: https://www.njta.gov/travel-resources/toll-calculator/toll-schedules-new-jersey-turnpike/
+  retrieved: 2026-10-14
+  notes: >
+    Values read from the PDF grid (entry row x exit column). "NJ E-ZPass Off-Peak" applies to
+    New Jersey-issued E-ZPass only; out-of-state E-ZPass pays the E-ZPass (peak) rate all day.
+    effective_from is assumed Jan 1 (schedule titled "2026"; the PDF prints no date).
+peak_windows:   # based on time of ENTRY
+  weekday: [["07:00", "09:00"], ["16:30", "18:30"]]
+  weekend: [["00:00", "24:00"]]
+interchanges:   # entry snapping points (OSM geometry via the routing engine), snap radius 3 km
+  - {id: "9", name: "NJ 18, New Brunswick", lat: 40.4808, lon: -74.4026}
+rates:
+  - {entry: "9",  exit: "16E", ezpass_peak: 10.29, nj_ezpass_off_peak: 7.72, cash: 10.40}
+  - {entry: "9",  exit: "15X", ezpass_peak: 9.42,  nj_ezpass_off_peak: 7.07, cash: 9.55}
+  - {entry: "8A", exit: "16E", ezpass_peak: 11.45, nj_ezpass_off_peak: 8.59, cash: 11.55}
+  - {entry: "8A", exit: "15X", ezpass_peak: 10.70, nj_ezpass_off_peak: 8.02, cash: 10.80}

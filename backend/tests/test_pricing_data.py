@@ -37,7 +37,7 @@ def test_every_kind_of_price_file_is_present(pricing: PricingData) -> None:
     assert pricing.rail_fares and pricing.flat_fares
     assert pricing.crossing_tolls and pricing.zone_tolls
     assert pricing.parking_lots and pricing.destination_parking
-    assert pricing.vehicle_defaults
+    assert pricing.vehicle_defaults and pricing.ticket_tolls
 
 
 def test_all_price_files_are_in_effect_on_the_demo_day(pricing: PricingData) -> None:

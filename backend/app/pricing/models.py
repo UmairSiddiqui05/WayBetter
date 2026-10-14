@@ -113,6 +113,8 @@ class CrossingToll(EffectiveDated, Sourced):
     facility_id: str
     operator: str
     direction_tolled: Literal["into_new_york", "both"]
+    route_match_names: tuple[str, ...]
+    """Road names that identify this facility on a driving route."""
     rates: CrossingRates
     peak_windows: PeakWindows
 
@@ -135,6 +137,37 @@ class ZoneToll(EffectiveDated, Sourced):
     charged_once_per_day: bool
     peak_windows: PeakWindows
     crossing_credit: CrossingCredit
+
+
+class Interchange(StrictModel):
+    id: str
+    name: str
+    lat: float
+    lon: float
+
+
+class TicketRate(StrictModel):
+    entry: str
+    exit: str
+    ezpass_peak: Money = Field(ge=0)
+    nj_ezpass_off_peak: Money = Field(ge=0)
+    cash: Money = Field(ge=0)
+
+
+class TicketToll(EffectiveDated, Sourced):
+    """A closed toll road priced by entry and exit interchange (e.g. NJ Turnpike)."""
+
+    kind: Literal["ticket_toll"]
+    facility_id: str
+    operator: str
+    road_ref_match: str
+    """Substring of the route step `ref` that marks a step as on this road."""
+    peak_windows: PeakWindows
+    interchanges: tuple[Interchange, ...]
+    rates: tuple[TicketRate, ...]
+
+    def rate(self, entry: str, exit_: str) -> TicketRate | None:
+        return next((r for r in self.rates if r.entry == entry and r.exit == exit_), None)
 
 
 # --- Parking -----------------------------------------------------------------
