@@ -14,17 +14,15 @@
   @font-face { font-family: "Public Sans"; font-style: italic; font-weight: 100 900; font-display: swap;
     src: url("/static/fonts/public-sans-latin-wght-italic.woff2") format("woff2"); }
 
-  /* Neutral chrome. Color is reserved for meaning: travel mode, tags, savings, data status. */
+  /* Transit-signage palette: black and white chrome, one signal yellow in the logo. Colour carries
+     meaning only: travel mode, cost part, the best tag, savings, unknown data. */
   :root {
-    --bg: #f4f6fb; --panel: #ffffff; --ink: #141a26; --ink-2: #364152; --muted: #5d6879;
-    --line: #e2e6ee; --soft: #eef1f6; --focus: #1d4ed8;
-    --brand: #1d4ed8; --brand-ink: #1e40af; --brand-bg: #eef4ff; --brand-line: #d5e2ff;
-    --navy: #0f172a; --navy-2: #1e3a8a; --brand-light: #8fb2ff;
-    --cheap: #0b7285; --cheap-bg: #e3f6f8; --fast: #6741d9; --fast-bg: #efeafe;
-    --car: #d9480f; --rail: #1c64d1; --subway: #2b8a3e; --walk: #868e96; --wait: #d5d9de;
-    --good: #2b8a3e; --good-bg: #e9f6ec;
-    --p-scheduled: #3d434b; --p-estimated: #a85a00; --p-unknown: #c92a2a; --p-other: #6741d9;
-    --radius: 10px;
+    --bg: #f6f6f3; --panel: #ffffff; --ink: #111418; --ink-2: #3a4048; --muted: #6a717b;
+    --line: #e3e4e6; --soft: #f0f1f2; --focus: #111418; --signal: #f5b800;
+    --car: #e8590c; --rail: #1c64d1; --subway: #2f9e44; --walk: #8a929c; --wait: #d5d8dc;
+    --c-gas_or_ev: #e8590c; --c-parking: #7048e8; --c-transit_fare: #1c64d1; --c-tolls: #e6a100; --c-congestion_fee: #c2255c;
+    --good: #2b8a3e; --good-bg: #ebf7ee; --bad: #c92a2a;
+    --radius: 8px;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -35,13 +33,15 @@
   [hidden] { display: none !important; }
   .i { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
   .i.sm { width: 14px; height: 14px; vertical-align: -2px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   header.top { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 12px; color: #fff;
-    background: linear-gradient(100deg, var(--navy) 0%, var(--navy) 45%, var(--navy-2) 100%); position: relative; z-index: 1001; }
+    background: var(--ink); position: relative; z-index: 1001; }
   header.top .icon-btn { color: #fff; } header.top .icon-btn:hover { background: rgba(255,255,255,.14); }
   .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
-  .logo span { color: var(--brand); } header.top .logo span { color: var(--brand-light); }
-  .corridor { font-size: 13px; color: #c7d0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  header.top .logo span { color: var(--signal); }
+  .corridor { font-size: 13px; color: #b9bec5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    padding-left: 10px; border-left: 1px solid #3a4048; }
   .icon-btn { display: inline-grid; place-items: center; width: 38px; height: 38px; flex: none; border: 0;
     border-radius: 999px; background: transparent; cursor: pointer; color: var(--ink-2); }
   .icon-btn:hover { background: var(--soft); }
@@ -52,104 +52,115 @@
   .view { padding: 14px 16px 8px; flex: 1 0 auto; }
   #map { height: 100%; background: #cfe3f3; }  /* water colour shows through offline */
 
-  /* Search card */
-  .search { border: 1px solid var(--line); border-top: 3px solid var(--brand); border-radius: 14px; padding: 12px; box-shadow: 0 2px 8px rgba(29,78,216,.08); }
+  /* Search */
+  .search { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
   #ask:empty { display: none; }  /* slot for the natural-language input another change adds */
-  #ask { margin: -2px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  #ask { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
   .route-fields { display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px; gap: 0 8px; align-items: center; }
   .route-rail { display: grid; justify-items: center; align-self: stretch; padding: 18px 0; }
-  .route-rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--brand); }
-  .route-rail .dot.end { background: var(--p-unknown); border-color: var(--p-unknown); border-radius: 2px; }
+  .route-rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
+  .route-rail .dot.end { background: var(--ink); border-radius: 2px; }
   .route-rail .line { width: 0; border-left: 2px dotted var(--walk); }
   .fields { display: grid; gap: 8px; min-width: 0; }
   .field { display: grid; gap: 2px; min-width: 0; }
   .field > span, .label { font-size: 12px; font-weight: 600; color: var(--muted); }
   select, input[type=datetime-local], input[type=time] { width: 100%; min-width: 0; padding: 8px 10px;
-    border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; }
   .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 10px; }
   .when-row .field { flex: 1 1 230px; }
   .when-row .primary { flex: 1 0 auto; }
-  .primary { padding: 9px 18px; font-weight: 700; border: 0; border-radius: 8px; background: var(--brand);
-    color: #fff; cursor: pointer; }
+  .primary { padding: 9px 18px; font-weight: 700; border: 0; border-radius: 6px; background: var(--ink); color: #fff; cursor: pointer; }
+  .primary:hover { background: #2a2f36; }
   .primary:disabled { opacity: .6; cursor: progress; }
-  .ghost { padding: 8px 14px; font-weight: 600; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+  .ghost { padding: 8px 14px; font-weight: 600; border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; cursor: pointer; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; font-size: 13px; font-weight: 600;
-    border: 1px solid var(--brand-line); border-radius: 999px; background: var(--brand-bg); color: var(--brand-ink); cursor: pointer; }
-  .chip:hover { border-color: var(--brand); }
+    border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; color: var(--ink-2); cursor: pointer; }
+  .chip:hover { border-color: var(--ink); }
 
   /* Results controls */
-  .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 14px 0 6px; }
+  .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 4px; }
   .tabs { display: flex; gap: 2px; overflow-x: auto; }
-  .tab { padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: none; font-weight: 600;
+  .tab { padding: 6px 10px; border: 0; border-bottom: 3px solid transparent; background: none; font-weight: 650;
     font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
-  .tab[aria-selected=true] { color: var(--brand); border-bottom-color: var(--brand); }
-  .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--soft); }
-  .seg button { padding: 4px 10px; border: 0; border-radius: 6px; background: none; font-size: 13px; font-weight: 600;
+  .tab[aria-selected=true] { color: var(--ink); border-bottom-color: var(--ink); }
+  .seg { display: inline-flex; padding: 2px; border-radius: 6px; border: 1px solid #cfd2d6; }
+  .seg button { padding: 3px 10px; border: 0; border-radius: 4px; background: none; font-size: 13px; font-weight: 650;
     color: var(--muted); cursor: pointer; }
-  .seg button[aria-pressed=true] { background: var(--brand); color: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.12); }
-  .prov-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
-  #about-legend { flex-direction: column; font-size: 14px; } #about-legend .prov { white-space: normal; font-weight: 400; }
-  #status { font-size: 13px; color: var(--muted); min-height: 18px; margin: 8px 0 4px; }
-  #status.error { color: var(--p-unknown); }
+  .seg button[aria-pressed=true] { background: var(--ink); color: #fff; }
+  .legend-line { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+  #about-legend { flex-direction: column; font-size: 14px; color: var(--ink-2); }
+  #status { font-size: 12px; color: var(--muted); min-height: 16px; margin: 4px 0 2px; }
+  #status.error { color: var(--bad); }
 
-  /* Provenance marks (N-02): an icon everywhere, the full word in the detail view. */
-  .prov { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .prov .i { width: 14px; height: 14px; }
-  .prov.scheduled, .prov.live { color: var(--p-scheduled); }
-  .prov.estimated { color: var(--p-estimated); }
-  .prov.unknown { color: var(--p-unknown); }
-  .prov.user_reported, .prov.ai_generated { color: var(--p-other); }
+  /* Data status (N-02) is carried by the number's own type: plain = scheduled/live,
+     dotted underline = estimated, red = unknown. The word is in the tooltip and for screen readers. */
+  .st-estimated { text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+  .st-unknown { color: var(--bad); }
+  .st-user_reported, .st-ai_generated { text-decoration: underline dashed; text-underline-offset: 3px; }
+  .pw { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; white-space: nowrap; }
+  .pw.st-unknown { color: var(--bad); }
+
+  /* Time-vs-cost chart */
+  .chart { margin: 4px 0 6px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .axis { stroke: #cfd2d6; stroke-width: 1; }
+  .chart .tick { font-size: 10px; fill: var(--muted); }
+  .chart .corner { font-size: 10px; font-weight: 700; fill: var(--good); letter-spacing: .04em; text-transform: uppercase; }
+  .chart .dot { cursor: pointer; }
+  .chart .dot circle { stroke: #fff; stroke-width: 2; }
+  .chart .dot.sel circle { stroke: var(--ink); stroke-width: 2.5; }
+  .chart .dot text { font-size: 11px; font-weight: 650; fill: var(--ink-2); }
+  .chart .dot.sel text { fill: var(--ink); font-weight: 800; }
+  .chart .note { font-size: 11px; color: var(--muted); }
 
   /* Ranked rows */
-  .rows { list-style: none; margin: 0; padding: 0; }
-  .row { display: grid; gap: 6px; padding: 12px 10px 12px 12px; border-bottom: 1px solid var(--line);
-    border-left: 3px solid transparent; cursor: pointer; }
-  .row:hover { background: var(--bg); }
-  .row.best { background: linear-gradient(90deg, var(--good-bg), #fff 75%); }
-  .row.selected { border-left-color: var(--brand); background: var(--brand-bg); }
-  .row-main { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  .name { font-weight: 650; font-size: 15px; line-height: 1.3; min-width: 0; }
-  .num { text-align: right; white-space: nowrap; }
-  .num b { font-size: 19px; font-weight: 750; letter-spacing: -0.01em; }
-  .num small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
-  .badges { display: flex; flex-wrap: wrap; gap: 4px; }
-  .badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); }
+  .rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .row { display: grid; gap: 7px; padding: 12px 10px 12px 12px; border-bottom: 1px solid var(--line);
+    border-left: 4px solid transparent; cursor: pointer; }
+  .row:hover { background: #fafaf8; }
+  .row.selected { border-left-color: var(--ink); background: #f7f7f4; }
+  .row-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .name { font-weight: 750; font-size: 17px; line-height: 1.25; letter-spacing: -0.01em; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .num { text-align: right; white-space: nowrap; line-height: 1.25; }
+  .num b { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+  .num .unit { display: block; font-size: 11px; color: var(--muted); font-weight: 650; }
+  .num .alt { display: block; font-size: 12px; color: var(--ink-2); }
+  .badge { justify-self: start; font-size: 11px; font-weight: 750; padding: 1px 7px; border-radius: 4px; border: 1px solid #cfd2d6; color: var(--ink-2); }
   .badge.best { background: var(--good); border-color: var(--good); color: #fff; }
-  .badge.cheap { background: var(--cheap-bg); border-color: var(--cheap-bg); color: var(--cheap); }
-  .badge.fast { background: var(--fast-bg); border-color: var(--fast-bg); color: var(--fast); }
-  .alt { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
-  .alt > span + span::before { content: " · "; }
-  .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 13px; }
-  .leg { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; white-space: nowrap; position: relative; }
-  .leg.car { color: var(--car); } .leg.rail { color: var(--rail); } .leg.subway { color: var(--subway); } .leg.walk { color: var(--muted); }
-  .legs .sep { color: #b8c0cc; width: 12px; height: 12px; }
-  .costs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12.5px; }
-  .costs-k { font-size: 11px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
-  .cost-i { padding: 1px 7px; border-radius: 6px; background: var(--soft); color: var(--ink-2); white-space: nowrap; }
-  .home-line { font-size: 12.5px; color: var(--muted); }
-  .home-line .i { color: var(--navy-2); }
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .bar { display: flex; height: 8px; gap: 2px; border-radius: 4px; overflow: hidden; }
+  .bars { display: grid; gap: 3px; }
+  .bar, .bar-labels { display: flex; gap: 2px; }
+  .bar { height: 8px; border-radius: 2px; overflow: hidden; }
   .bar span { min-width: 3px; }
+  .bar-labels span { min-width: 3px; overflow: hidden; white-space: nowrap; font-size: 12px; font-weight: 650; display: flex; align-items: center; gap: 2px; }
+  .bar-labels .i { width: 13px; height: 13px; }
   .seg-car { background: var(--car); } .seg-rail { background: var(--rail); } .seg-subway { background: var(--subway); }
   .seg-walk { background: var(--walk); }
   .seg-wait { background: repeating-linear-gradient(135deg, var(--wait) 0 3px, #fff 3px 5px); }
-  .meta { font-size: 13px; color: var(--muted); }
-  .meta .save { color: var(--good); font-weight: 650; }
+  .lab-car { color: var(--car); } .lab-rail { color: var(--rail); } .lab-subway { color: var(--subway); } .lab-walk { color: var(--muted); }
+  .cbar { height: 6px; }
+  .ckey { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; color: var(--ink-2); }
+  .ckey > span { white-space: nowrap; }
+  .ckey i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+  .meta { font-size: 13px; color: var(--ink-2); }
+  .save { color: var(--good); font-weight: 700; }
+  .home-line { font-size: 12.5px; color: var(--muted); }
 
   /* Detail */
-  .back { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; margin: 0 0 10px -6px;
-    border: 0; border-radius: 8px; background: none; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+  .back { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; margin: 4px 0 8px -6px;
+    border: 0; border-radius: 6px; background: none; font-weight: 650; color: var(--ink-2); cursor: pointer; }
   .back:hover { background: var(--soft); }
-  h2 { font-size: 19px; line-height: 1.25; margin: 8px 0 6px; letter-spacing: -0.01em; }
-  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--brand-ink); margin: 18px 0 6px; }
-  .why { margin: 0 0 12px; color: var(--ink-2); }
-  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .tile { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
-  .tile:first-child { background: var(--brand-bg); border-color: var(--brand-line); }
+  h2 { font-size: 22px; line-height: 1.2; margin: 6px 0 2px; letter-spacing: -0.02em; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 0 6px;
+    padding-bottom: 4px; border-bottom: 2px solid var(--ink); }
+  .why { margin: 8px 0 12px; color: var(--ink-2); }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .tile { padding: 8px 10px; min-width: 0; }
+  .tile + .tile { border-left: 1px solid var(--line); }
   .tile .k { font-size: 12px; font-weight: 600; color: var(--muted); }
-  .tile .v { font-size: 20px; font-weight: 750; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .tile .v { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
   .steps { list-style: none; margin: 0; padding: 0; }
   .steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--soft); align-items: start; }
   .steps li:first-child { border-top: 0; }
@@ -157,31 +168,34 @@
   .mode-ic .i { width: 15px; height: 15px; }
   .mode-ic.car { background: var(--car); } .mode-ic.rail { background: var(--rail); }
   .mode-ic.subway { background: var(--subway); } .mode-ic.walk { background: var(--walk); }
-  .step-t { font-weight: 600; } .step-s { font-size: 13px; color: var(--muted); }
-  .step-r { font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
-  details { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
-  details > summary { display: flex; align-items: center; gap: 6px; padding: 9px 12px; cursor: pointer; font-weight: 600; list-style: none; }
+  .step-t { font-weight: 650; } .step-s { font-size: 13px; color: var(--muted); }
+  .step-r { font-size: 13px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+  details { margin-top: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  details + details { margin-top: 0; border-top: 0; }
+  details > summary { display: flex; align-items: center; gap: 6px; padding: 9px 2px; cursor: pointer; font-weight: 650; list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
   details > summary .chev { transition: transform .15s; color: var(--muted); }
   details[open] > summary .chev { transform: rotate(90deg); }
-  details > .body { padding: 0 12px 10px; }
+  details > .body { padding: 0 2px 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   td, th { padding: 6px 0; border-top: 1px solid var(--soft); vertical-align: top; text-align: left; }
   th { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; border-top: 0; }
   .amt { text-align: right; white-space: nowrap; padding-left: 8px; }
   td .note { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-  tr.total td { font-weight: 750; border-top: 1px solid var(--line); }
+  td i.sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
   .periods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   .periods .full { grid-column: 1 / -1; }
+  .periods .tile { border: 1px solid var(--line); border-radius: var(--radius); }
+  .periods .tile + .tile { border-left: 1px solid var(--line); }
   .save-box { border-radius: var(--radius); background: var(--good-bg); padding: 8px 10px; }
-  .save-box .k { color: var(--good); font-weight: 700; font-size: 13px; }
-  .save-box .vals { display: flex; flex-wrap: wrap; gap: 2px 14px; font-weight: 650; }
+  .save-box .k { color: var(--good); font-weight: 750; font-size: 13px; }
+  .save-box .vals { display: flex; flex-wrap: wrap; gap: 2px 14px; font-weight: 700; }
   .hint { font-size: 12px; color: var(--muted); }
   ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 4px 0; }
 
   /* Secondary views */
   .view-title { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-  .view-title h2 { margin: 0; }
   .src { padding: 10px 0; border-bottom: 1px solid var(--line); }
   .src .cat { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .src a { color: var(--ink-2); overflow-wrap: anywhere; }
@@ -195,23 +209,25 @@
   .linkish { border: 0; background: none; padding: 0; color: var(--ink-2); text-decoration: underline; cursor: pointer; font-size: inherit; }
 
   /* Drawer */
-  .scrim { position: fixed; inset: 0; background: rgba(16,24,40,.35); z-index: 1100; }
+  .scrim { position: fixed; inset: 0; background: rgba(17,20,24,.4); z-index: 1100; }
   .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); background: var(--panel); z-index: 1101;
-    box-shadow: 4px 0 24px rgba(16,24,40,.18); padding: 10px; display: flex; flex-direction: column; gap: 2px; }
-  .drawer .logo { padding: 6px 10px 12px; display: flex; justify-content: space-between; align-items: center; }
-  .nav { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 8px; background: none;
-    font-weight: 600; text-align: left; cursor: pointer; color: var(--ink-2); }
+    box-shadow: 4px 0 24px rgba(17,20,24,.2); display: flex; flex-direction: column; gap: 2px; padding: 0 0 10px; }
+  .drawer .logo { height: 56px; padding: 0 8px 0 18px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+    background: var(--ink); color: #fff; }
+  .drawer .logo span { color: var(--signal); } .drawer .logo .icon-btn { color: #fff; }
+  .nav { display: flex; align-items: center; gap: 12px; margin: 0 10px; padding: 10px 12px; border: 0; border-radius: 6px; background: none;
+    font-weight: 650; text-align: left; cursor: pointer; color: var(--ink-2); }
   .nav:hover { background: var(--soft); color: var(--ink); }
-  .nav[aria-current=page] { background: var(--brand-bg); color: var(--brand-ink); }
+  .nav[aria-current=page] { background: var(--soft); color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
 
   /* Map bits */
-  .legend { background: #fff; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.7; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+  .legend { background: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.7; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
   .legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
   .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .pin .i { width: 15px; height: 15px; }
   .pin.lot { background: var(--rail); border-radius: 6px; }
   .pin.origin { background: var(--ink); }
-  .pin.dest { background: var(--p-unknown); }
+  .pin.dest { background: var(--bad); }
   .pin.hub { background: #fff; color: var(--rail); border-color: var(--rail); }
 
   @media (max-width: 860px) {
@@ -271,7 +287,8 @@
             <button type="button" data-period="month" aria-pressed="false">Month</button>
           </div>
         </div>
-        <div class="prov-legend" id="prov-legend"></div>
+        <div class="legend-line" id="prov-legend"></div>
+        <div class="chart" id="chart"></div>
       </div>
       <div id="status" role="status" aria-live="polite"></div>
       <ol class="rows" id="list" aria-label="Ranked options"></ol>
@@ -306,7 +323,7 @@
       <div class="view-title"><button class="back" type="button" data-view="plan"></button></div>
       <h2>About and limitations</h2>
       <p>WayBetter compares driving all the way in with parking at a station and taking the train, door to door, on time and total cost. Every number comes from the server, and each one is marked with where it came from:</p>
-      <div class="prov-legend" id="about-legend"></div>
+      <div class="legend-line" id="about-legend"></div>
       <h3>Limitations for this search</h3>
       <ul class="plain" id="disclaimers"><li class="hint">The server sends its disclaimers with each comparison. Run one to see them here.</li></ul>
     </section>
@@ -328,20 +345,21 @@ const CSSV = (name) => getComputedStyle(document.documentElement).getPropertyVal
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const ic = (name, cls = "") => `<svg class="i ${cls}" aria-hidden="true" focusable="false"><use href="/static/icons/sprite.svg#${name}"></use></svg>`;
 
-// ---- Provenance (N-02) --------------------------------------------------------------------
+// ---- Data status (N-02) -------------------------------------------------------------------
+// Every number carries its server status in its own type (see .st-* in the CSS), in a tooltip,
+// and as text for screen readers. The detail view also prints the word.
 const PROV = {
-  scheduled: { icon: "circle-check", word: "scheduled", hint: "a published timetable or price" },
-  live: { icon: "radio", word: "live", hint: "real-time data" },
-  estimated: { icon: "equal-approximately", word: "estimated", hint: "an average or a derived figure" },
-  unknown: { icon: "circle-help", word: "unknown", hint: "no sourced value" },
-  user_reported: { icon: "user", word: "user reported", hint: "reported by a user" },
-  ai_generated: { icon: "sparkles", word: "AI generated", hint: "phrased by AI from computed numbers" },
+  scheduled: { word: "scheduled", hint: "a published timetable or price" },
+  live: { word: "live", hint: "real-time data" },
+  estimated: { word: "estimated", hint: "an average or a derived figure" },
+  unknown: { word: "unknown", hint: "no sourced value" },
+  user_reported: { word: "user reported", hint: "reported by a user" },
+  ai_generated: { word: "AI generated", hint: "phrased by AI from computed numbers" },
 };
 const provOf = (p) => PROV[p] || PROV.unknown;
-// Icon only (lists): the word is the accessible name and the tooltip.
-const mark = (p) => `<span class="prov ${esc(p)}" role="img" aria-label="${esc(provOf(p).word)}" title="${esc(provOf(p).word)}">${ic(provOf(p).icon)}</span>`;
-// Icon + full word (detail view).
-const word = (p) => `<span class="prov ${esc(p)}" title="${esc(provOf(p).word)}: ${esc(provOf(p).hint)}">${ic(provOf(p).icon)}${esc(provOf(p).word)}</span>`;
+const stKey = (p) => (PROV[p] ? p : "unknown");
+const val = (text, p) => `<span class="st-${stKey(p)}" title="${esc(provOf(p).word)}: ${esc(provOf(p).hint)}">${text}<span class="sr"> (${esc(provOf(p).word)})</span></span>`;
+const word = (p) => `<span class="pw st-${stKey(p)}" title="${esc(provOf(p).hint)}">${esc(provOf(p).word)}</span>`;
 // A total is as certain as its least certain part. Display roll-up of the server's own labels
 // for the totals the API sends without a status (CostBreakdown.total, total_minutes); see the
 // PROGRESS backlog item to send these from the server.
@@ -351,8 +369,8 @@ const COST_ROWS = [["Gas", "gas_or_ev"], ["Parking", "parking"], ["Train / subwa
 const totalProv = (c) => LEAST_CERTAIN.find((p) => COST_ROWS.some(([, k]) => c[k].provenance === p)) || "unknown";
 const timeProv = (legs) => LEAST_CERTAIN.find((p) => legs.some((l) => l.time_provenance === p)) || "unknown";
 const legendHtml = (full) => ["scheduled", "estimated", "unknown"].map((p) => full
-  ? `<span class="prov ${p}">${ic(provOf(p).icon)}<span><b>${provOf(p).word}</b>: ${provOf(p).hint}</span></span>`
-  : `<span class="prov ${p}" title="${provOf(p).word}: ${provOf(p).hint}">${ic(provOf(p).icon)}${provOf(p).word}</span>`).join("");
+  ? `<span>${val(provOf(p).word, p)}: ${provOf(p).hint}</span>`
+  : `<span>${val(provOf(p).word, p)}</span>`).join("");
 
 // ---- Formatting ---------------------------------------------------------------------------
 const clock = (iso) => { // server sends local time with offset; show it as-is
@@ -360,11 +378,14 @@ const clock = (iso) => { // server sends local time with offset; show it as-is
   const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
   return `${h}:${String(m).padStart(2, "0")} ${ap}`;
 };
+const clockShort = (iso) => clock(iso).slice(0, -3);
+const range = (a, b) => clock(a).slice(-2) === clock(b).slice(-2) ? `${clockShort(a)}–${clock(b)}` : `${clock(a)}–${clock(b)}`;
 const hhmm = (s) => s ? clock(`0000-00-00T${s}`) : "";
 const money = (v) => (v === null || v === undefined) ? "unknown"
   : `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const mins = (m) => `${Math.round(m)} min`;
 const humanize = (key) => { const s = String(key).replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
+const titleCase = (s) => String(s).toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 
 // ---- Static chrome --------------------------------------------------------------------------
 $("menu-btn").innerHTML = ic("menu");
@@ -373,7 +394,7 @@ $("swap").innerHTML = ic("arrow-up-down");
 const NAV = { plan: ["map", "Plan a trip"], settings: ["settings", "Settings"], sources: ["database", "Data sources"], about: ["info", "About and limitations"] };
 document.querySelectorAll(".nav").forEach((b) => { const [i, t] = NAV[b.dataset.view]; b.innerHTML = `${ic(i)}${t}`; });
 document.querySelectorAll(".view-title .back").forEach((b) => { b.innerHTML = `${ic("arrow-left")}Back to trip`; });
-$("prov-legend").innerHTML = `<span>Data status:</span>${legendHtml(false)}`;
+$("prov-legend").innerHTML = `<span>Numbers that are</span>${legendHtml(false)}`;
 $("about-legend").innerHTML = legendHtml(true);
 $("corridor").textContent = PRESETS.corridor;
 
@@ -392,6 +413,11 @@ $("swap").addEventListener("click", () => {
   [fromList, toList] = [toList, fromList];
   fillSelect($("origin"), fromList, d); fillSelect($("destination"), toList, o);
 });
+// Deep link for presenting: ?from=<preset id>&to=<preset id>&at=YYYY-MM-DDTHH:MM (all optional).
+const PARAMS = new URLSearchParams(location.search);
+if (PRESETS.origins.some((p) => p.id === PARAMS.get("from"))) $("origin").value = PARAMS.get("from");
+if (PRESETS.destinations.some((p) => p.id === PARAMS.get("to"))) $("destination").value = PARAMS.get("to");
+if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(PARAMS.get("at") || "")) $("when").value = PARAMS.get("at");
 
 // ---- Settings (localStorage is a convenience; every access may throw) ----------------------
 const STORE_KEY = "waybetter.settings.v1";
@@ -474,7 +500,7 @@ fetch("/static/basemap-ny-nj-ct.geojson").then((r) => r.json()).then((geo) => {
     style: { color: "#8a94a6", weight: 1, fillColor: "#f3efe6", fillOpacity: 1 } }).addTo(map);
   map.attributionControl.addAttribution("Outlines: Natural Earth");
 }).catch(() => {});
-const OFFLINE = new URLSearchParams(location.search).has("offline");
+const OFFLINE = PARAMS.has("offline");
 if (!OFFLINE) {
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
@@ -548,20 +574,25 @@ let session = null, current = [], selected = 0, sortMode = null, sortOptions = [
 // The three server numbers a row can lead with. Picks fields; never computes one.
 function figures(r) {
   const rt = r.round_trip;
-  const none = (unit, short) => ({ amount: null, prov: "unknown", unit, short });
+  const none = (unit, alt) => ({ amount: null, prov: "unknown", unit, alt });
   return {
-    trip: { amount: r.cost_breakdown.total, prov: totalProv(r.cost_breakdown), unit: "one way", short: " one way" },
-    day: rt ? { amount: rt.daily_cost_breakdown.total, prov: totalProv(rt.daily_cost_breakdown), unit: "per day", short: "/day" }
-      : none("per day", "/day"),
-    month: rt ? { amount: rt.monthly_cost.amount, prov: rt.monthly_cost.provenance, unit: "per month", short: "/month" }
-      : none("per month", "/month"),
+    trip: { amount: r.cost_breakdown.total, prov: totalProv(r.cost_breakdown), unit: "one way", alt: "one way" },
+    day: rt ? { amount: rt.daily_cost_breakdown.total, prov: totalProv(rt.daily_cost_breakdown), unit: "per day", alt: "a day" }
+      : none("per day", "a day"),
+    month: rt ? { amount: rt.monthly_cost.amount, prov: rt.monthly_cost.provenance, unit: "per month", alt: "a month" }
+      : none("per month", "a month"),
   };
 }
-const TAG_CLASS = { "Best overall": "best", "Cheapest": "cheap", "Fastest": "fast" };
-const badgesHtml = (r) => (r.label || "").split(" · ").filter(Boolean)
-  .map((l) => `<span class="badge ${TAG_CLASS[l] || ""}">${esc(l)}</span>`).join("");
+// Short title: the boarding station's name as the server sends it on the train leg.
+const railLeg = (r) => r.legs.find((l) => legKind(l) === "rail");
+const rowTitle = (r) => { const t = railLeg(r); return t && t.start_location.label ? titleCase(t.start_location.label) : r.summary; };
+const rowSub = (r) => railLeg(r) ? r.summary : `${r.drive_miles} mi by car`;
+// One tag per row: the server's first (primary) label.
+const firstTag = (r) => (r.label || "").split(" · ").filter(Boolean)[0];
+const tagHtml = (r) => { const t = firstTag(r); return t ? `<span class="badge ${t === "Best overall" ? "best" : ""}">${esc(t)}</span>` : ""; };
 
 const KIND_WORD = { car: "Drive", rail: "Train", subway: "Subway", walk: "Walk", wait: "Wait" };
+const MODE_ICON = { car: "car", rail: "train-front", subway: "tram-front", walk: "footprints" };
 function segments(legs) { // the server's legs, plus the gaps between them shown as waiting
   const out = [];
   legs.forEach((leg, i) => {
@@ -569,124 +600,161 @@ function segments(legs) { // the server's legs, plus the gaps between them shown
       const gap = (Date.parse(leg.start_time) - Date.parse(legs[i - 1].end_time)) / 60000;
       if (gap >= 1) out.push({ kind: "wait", minutes: gap });
     }
-    out.push({ kind: legKind(leg), minutes: leg.duration_minutes });
+    out.push({ kind: legKind(leg), minutes: leg.duration_minutes, leg });
   });
   return out;
 }
-function barHtml(r, longest) {
+function timeBar(r, longest) { // the bar and, under each segment, its minutes or train times
   const segs = segments(r.legs);
+  const total = segs.reduce((a, s) => a + s.minutes, 0) || 1;
+  const width = `width:${(100 * r.total_minutes / longest).toFixed(1)}%`;
   const label = segs.map((s) => `${KIND_WORD[s.kind]} ${mins(s.minutes)}`).join(", ");
-  return `<div class="bar" role="img" aria-label="${esc(label)}" style="width:${(100 * r.total_minutes / longest).toFixed(1)}%">${
-    segs.map((s) => `<span class="seg-${s.kind}" style="flex:${s.minutes} 1 0" title="${esc(KIND_WORD[s.kind])} ${mins(s.minutes)}"></span>`).join("")}</div>`;
+  const text = (s) => s.kind === "rail" ? `${clockShort(s.leg.start_time)}–${clockShort(s.leg.end_time)}` : mins(s.minutes);
+  return `<div class="bars"><div class="bar" role="img" aria-label="${esc(label)}" style="${width}">${
+    segs.map((s) => `<span class="seg-${s.kind}" style="flex:${s.minutes} 1 0" title="${esc(KIND_WORD[s.kind])} ${mins(s.minutes)}"></span>`).join("")}</div>
+    <div class="bar-labels" aria-hidden="true" style="${width}">${segs.map((s) => {
+      const share = s.minutes / total;
+      const body = s.kind === "wait" || share < 0.07 ? "" : `${ic(MODE_ICON[s.kind])}${share >= 0.2 ? text(s) : ""}`;
+      return `<span class="lab-${s.kind}" style="flex:${s.minutes} 1 0" title="${esc(KIND_WORD[s.kind])} ${mins(s.minutes)}">${body}</span>`;
+    }).join("")}</div></div>`;
 }
-function legsLine(legs) { // each leg: mode icon, then train times or minutes
-  return `<div class="legs">${legs.map((leg) => {
-    const k = legKind(leg);
-    const text = k === "rail" ? `${clock(leg.start_time)} – ${clock(leg.end_time)}` : mins(leg.duration_minutes);
-    return `<span class="leg ${k}" title="${KIND_WORD[k]}">${ic(MODE_ICON[k], "sm")}<span class="sr">${KIND_WORD[k]} </span>${text}</span>`;
-  }).join(ic("chevron-right", "sep"))}</div>`;
+const COST_SHORT = { gas_or_ev: "Gas", parking: "Parking", transit_fare: "Train", tolls: "Tolls", congestion_fee: "Congestion" };
+const costBreakdown = (r) => (period !== "trip" && r.round_trip) ? r.round_trip.daily_cost_breakdown : r.cost_breakdown;
+function costBar(r, priciest) { // the money behind the number, same scale on every row
+  const c = costBreakdown(r);
+  const parts = COST_ROWS.map(([, k]) => k).filter((k) => c[k].amount !== 0);
+  const drawn = parts.filter((k) => c[k].amount !== null);
+  const label = parts.map((k) => `${COST_SHORT[k]} ${money(c[k].amount)}`).join(", ");
+  return `<div class="bars"><div class="bar cbar" role="img" aria-label="Cost: ${esc(label)}" style="width:${(100 * c.total / priciest).toFixed(1)}%">${
+    drawn.map((k) => `<span style="flex:${c[k].amount} 1 0;background:var(--c-${k})" title="${COST_SHORT[k]} ${money(c[k].amount)}"></span>`).join("")}</div>
+    <div class="ckey">${parts.map((k) => `<span><i style="background:var(--c-${k})"></i>${COST_SHORT[k]} ${val(money(c[k].amount), c[k].provenance)}</span>`).join("")}</div></div>`;
 }
 function savedText(e, unit) {
   if (!e) return "";
-  if (e.amount === null) return `savings ${unit} unknown ${mark(e.provenance)}`;
-  return e.amount >= 0 ? `saves ${money(e.amount)}${unit} ${mark(e.provenance)}` : `costs ${money(-e.amount)}${unit} more ${mark(e.provenance)}`;
+  if (e.amount === null) return `savings ${unit} ${val("unknown", e.provenance)}`;
+  return e.amount >= 0 ? `saves ${val(money(e.amount), e.provenance)} ${unit}` : `costs ${val(money(-e.amount), e.provenance)} more ${unit}`;
 }
 function metaHtml(r) {
   const first = r.legs[0], last = r.legs[r.legs.length - 1];
   const parts = [];
-  if (first && last) parts.push(`${clock(first.start_time)} – ${clock(last.end_time)}`);
-  parts.push(`${mins(r.total_minutes)} ${mark(timeProv(r.legs))}`);
+  if (first && last) parts.push(val(`${range(first.start_time, last.end_time)} · ${mins(r.total_minutes)}`, timeProv(r.legs)));
   const s = r.round_trip && r.round_trip.savings_vs_drive;
-  if (s) parts.push(`<span class="save">${period === "month" ? savedText(s.monthly, "/month") : savedText(s.daily, "/day")}</span>`);
+  if (s) parts.push(`<span class="save">${period === "month" ? savedText(s.monthly, "a month") : savedText(s.daily, "a day")}</span>`);
   return parts.join(" · ");
-}
-const COST_SHORT = { gas_or_ev: "Gas", parking: "Parking", transit_fare: "Train", tolls: "Tolls", congestion_fee: "Congestion" };
-function costsLine(r) { // the parts behind the number; zero-cost parts are left to the detail view
-  const daily = period !== "trip" && r.round_trip;
-  const c = daily ? r.round_trip.daily_cost_breakdown : r.cost_breakdown;
-  const items = COST_ROWS.filter(([, k]) => c[k].amount !== 0)
-    .map(([, k]) => `<span class="cost-i">${COST_SHORT[k]} ${money(c[k].amount)} ${mark(c[k].provenance)}</span>`);
-  return items.length ? `<div class="costs"><span class="costs-k">${daily ? "Per day" : "One way"}</span>${items.join("")}</div>` : "";
 }
 function renderRows() {
   const longest = Math.max(...current.map((r) => r.total_minutes), 1);
+  const priciest = Math.max(...current.map((r) => costBreakdown(r).total), 1);
   $("list").innerHTML = current.map((r, idx) => {
     const f = figures(r), h = f[period], rt = r.round_trip;
     const others = Object.keys(f).filter((k) => k !== period)
-      .map((k) => `<span>${money(f[k].amount)}${f[k].short} ${mark(f[k].prov)}</span>`).join("");
-    const best = (r.label || "").split(" · ").includes("Best overall");
-    return `<li class="row ${best ? "best" : ""} ${idx === selected ? "selected" : ""}" data-idx="${idx}" tabindex="0" role="button"
-        aria-label="${esc(r.summary)}: ${esc(money(h.amount))} ${h.unit}. Open details">
-      ${r.label ? `<div class="badges">${badgesHtml(r)}</div>` : ""}
-      <div class="row-main"><div class="name">${esc(r.summary)}</div>
-        <div class="num"><b>${money(h.amount)}</b> ${mark(h.prov)}<small>${h.unit}</small></div></div>
-      <div class="alt">${others}</div>
-      ${barHtml(r, longest)}
-      ${legsLine(r.legs)}
+      .map((k) => `<span class="alt">${val(money(f[k].amount), f[k].prov)} ${f[k].alt}</span>`).join("");
+    return `<li class="row ${idx === selected ? "selected" : ""}" data-idx="${idx}" tabindex="0" role="button"
+        aria-label="${esc(rowTitle(r))}: ${esc(money(h.amount))} ${h.unit}. Open details">
+      ${tagHtml(r)}
+      <div class="row-main"><div><div class="name">${esc(rowTitle(r))}</div><div class="sub">${esc(rowSub(r))}</div></div>
+        <div class="num"><b>${val(money(h.amount), h.prov)}</b><span class="unit">${h.unit}</span>${others}</div></div>
+      ${timeBar(r, longest)}
       <div class="meta">${metaHtml(r)}</div>
-      ${costsLine(r)}
-      ${rt ? `<div class="home-line">${ic("moon", "sm")} Home: ${esc(rt.return_summary)} ${mark(timeProv(rt.return_legs))}</div>` : ""}
+      ${costBar(r, priciest)}
+      ${rt ? `<div class="home-line">${ic("moon", "sm")} Home: ${esc(rt.return_summary)} ${word(timeProv(rt.return_legs))}</div>` : ""}
     </li>`;
   }).join("");
 }
 
+// ---- Time-vs-cost chart: each option is a dot; bottom-left is faster and cheaper -------------
+function renderChart() {
+  const pts = current.map((r, idx) => ({ r, idx, f: figures(r)[period] })).filter((p) => p.f.amount !== null);
+  const missing = current.filter((r) => figures(r)[period].amount === null).map((r) => rowTitle(r));
+  if (pts.length < 2) { $("chart").innerHTML = ""; return; }
+  const W = 400, H = 180, L0 = 60, R0 = 120, T0 = 18, B0 = 28;
+  const xs = pts.map((p) => p.r.total_minutes), ys = pts.map((p) => p.f.amount);
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)], [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  const dx = (x1 - x0) * 0.08 || 5, dy = (y1 - y0) * 0.1 || 1;  // keep dots off the axes
+  const X = (v) => L0 + (v - x0 + dx) / (x1 - x0 + 2 * dx) * (W - L0 - R0);
+  const Y = (v) => H - B0 - (v - y0 + dy) / (y1 - y0 + 2 * dy) * (H - T0 - B0);
+  // Labels stack in a column on the right, each joined to its dot by a thin leader line.
+  const placed = pts.map((p) => ({ ...p, x: X(p.r.total_minutes), y: Y(p.f.amount) })).sort((a, b) => a.y - b.y);
+  placed.forEach((p, i) => { p.ly = Math.max(p.y, i ? placed[i - 1].ly + 14 : T0); });
+  for (let i = placed.length - 1, max = H - B0; i >= 0; i--) { placed[i].ly = Math.min(placed[i].ly, max); max = placed[i].ly - 14; }
+  const lx = W - R0 + 16, unit = figures(current[0])[period].unit;
+  $("chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Door-to-door minutes against cost ${esc(unit)} for each option">
+    <line class="axis" x1="${L0}" y1="${H - B0}" x2="${W - R0}" y2="${H - B0}"/><line class="axis" x1="${L0}" y1="${T0 - 6}" x2="${L0}" y2="${H - B0}"/>
+    <text class="tick" x="0" y="${T0 - 8}">Cost ${esc(unit)}</text>
+    <text class="tick" x="${L0 - 6}" y="${Y(y0) + 3}" text-anchor="end">${money(y0)}</text>
+    <text class="tick" x="${L0 - 6}" y="${Y(y1) + 3}" text-anchor="end">${money(y1)}</text>
+    <text class="tick" x="${X(x0)}" y="${H - B0 + 13}" text-anchor="middle">${mins(x0)}</text>
+    <text class="tick" x="${X(x1)}" y="${H - B0 + 13}" text-anchor="middle">${mins(x1)}</text>
+    <text class="tick" x="${W - R0}" y="${H - 2}" text-anchor="end">door to door →</text>
+    <text class="corner" x="${L0 + 6}" y="${H - B0 - 6}">faster &amp; cheaper</text>
+    ${placed.map((p) => `<g class="dot ${p.idx === selected ? "sel" : ""}" data-idx="${p.idx}">
+      <title>${esc(rowTitle(p.r))}: ${mins(p.r.total_minutes)}, ${money(p.f.amount)} ${esc(unit)} (${esc(provOf(p.f.prov).word)})</title>
+      <polyline points="${p.x + 7},${p.y} ${lx - 6},${p.ly}" fill="none" stroke="#cfd2d6" stroke-width="1"/>
+      <circle cx="${p.x}" cy="${p.y}" r="${p.idx === selected ? 7 : 6}" fill="${CSSV(railLeg(p.r) ? "--rail" : "--car")}"/>
+      <text x="${lx}" y="${p.ly + 4}">${esc(rowTitle(p.r))}</text></g>`).join("")}
+  </svg>${missing.length ? `<div class="note">Not plotted (cost unknown): ${missing.map(esc).join(", ")}</div>` : ""}`;
+}
+$("chart").addEventListener("click", (e) => { const g = e.target.closest(".dot"); if (g) openDetail(Number(g.dataset.idx)); });
+
 // ---- Detail ---------------------------------------------------------------------------------
 function stepTitle(leg) {
   const k = legKind(leg);
-  if (k === "car") return leg.end_location.label ? `Drive to ${esc(leg.end_location.label)}` : "Drive";
+  if (k === "car") return leg.end_location.label ? `Drive to ${esc(titleCase(leg.end_location.label))}` : "Drive";
   if (k === "walk") {
     if (leg.leg_id === "walk-1") return "Park and walk to the platform";
     if (leg.leg_id === "home-walk-car") return "Walk back to the car";
-    return leg.end_location.label ? `Walk to ${esc(leg.end_location.label)}` : "Walk";
+    return leg.end_location.label ? `Walk to ${esc(titleCase(leg.end_location.label))}` : "Walk";
   }
   if (k === "subway") return "Subway";
-  return `${esc(leg.route_name || "Train")}${leg.end_location.label ? ` to ${esc(leg.end_location.label)}` : ""}`;
+  return `${esc(leg.route_name || "Train")}${leg.end_location.label ? ` to ${esc(titleCase(leg.end_location.label))}` : ""}`;
 }
-const MODE_ICON = { car: "car", rail: "train-front", subway: "tram-front", walk: "footprints" };
 function stepsHtml(legs) {
   return `<ol class="steps">${legs.map((leg) => {
     const k = legKind(leg);
-    const sub = [leg.distance_miles ? `${leg.distance_miles} mi` : "", leg.headsign ? `toward ${esc(leg.headsign)}` : ""].filter(Boolean).join(" · ");
+    const sub = [leg.distance_miles ? `${leg.distance_miles} mi` : "", leg.headsign ? `toward ${esc(titleCase(leg.headsign))}` : ""].filter(Boolean).join(" · ");
     return `<li><span class="mode-ic ${k}">${ic(MODE_ICON[k])}</span>
-      <div><div class="step-t">${stepTitle(leg)}</div><div class="step-s">${clock(leg.start_time)} – ${clock(leg.end_time)}${sub ? ` · ${sub}` : ""}</div></div>
-      <div class="step-r">${mins(leg.duration_minutes)}<br>${word(leg.time_provenance)}</div></li>`;
+      <div><div class="step-t">${stepTitle(leg)}</div><div class="step-s">${val(range(leg.start_time, leg.end_time), leg.time_provenance)}${sub ? ` · ${sub}` : ""}</div></div>
+      <div class="step-r">${val(mins(leg.duration_minutes), leg.time_provenance)}<br>${word(leg.time_provenance)}</div></li>`;
   }).join("")}</ol>`;
 }
 const noteHtml = (n) => esc(n).split("; ").join("<br>");
+const swatch = (k) => `<i class="sw" style="background:var(--c-${k})"></i>`;
 function breakdownHtml(c, title) {
   return `<table><thead><tr><th>${title}</th><th></th><th class="amt">Cost</th></tr></thead><tbody>${
-    COST_ROWS.map(([name, key]) => `<tr><td>${name}</td><td>${word(c[key].provenance)}</td><td class="amt">${money(c[key].amount)}</td></tr>`).join("")}
-    <tr class="total"><td>Total</td><td>${word(totalProv(c))}</td><td class="amt">${money(c.total)}</td></tr></tbody></table>`;
+    COST_ROWS.map(([name, key]) => `<tr><td>${swatch(key)}${name}</td><td>${word(c[key].provenance)}</td><td class="amt">${val(money(c[key].amount), c[key].provenance)}</td></tr>`).join("")}
+    <tr class="total"><td>Total</td><td>${word(totalProv(c))}</td><td class="amt">${val(money(c.total), totalProv(c))}</td></tr></tbody></table>`;
 }
 function splitHtml(c, rt) {
   const home = rt.return_cost_breakdown, day = rt.daily_cost_breakdown;
+  const cell = (e) => `<td class="amt">${val(money(e.amount), e.provenance)}</td>`;
   const rows = COST_ROWS.map(([name, key]) => {
     const m = c[key], h = home[key], d = day[key];
     const notes = [m.note, h.note && h.note !== m.note ? `Home: ${h.note}` : null, d.note && d.note !== m.note ? `Day: ${d.note}` : null].filter(Boolean);
-    return `<tr><td>${name}<span class="note">${notes.map(noteHtml).join("<br>")}</span></td>
-      <td class="amt">${money(m.amount)} ${mark(m.provenance)}</td><td class="amt">${money(h.amount)} ${mark(h.provenance)}</td><td class="amt">${money(d.amount)} ${mark(d.provenance)}</td></tr>`;
+    return `<tr><td>${name}<span class="note">${notes.map(noteHtml).join("<br>")}</span></td>${cell(m)}${cell(h)}${cell(d)}</tr>`;
   }).join("");
+  const tot = (b) => `<td class="amt">${val(money(b.total), totalProv(b))}</td>`;
   return `<table><thead><tr><th></th><th class="amt">Morning</th><th class="amt">Home</th><th class="amt">Day</th></tr></thead><tbody>${rows}
-    <tr class="total"><td>Total</td><td class="amt">${money(c.total)} ${mark(totalProv(c))}</td><td class="amt">${money(home.total)} ${mark(totalProv(home))}</td><td class="amt">${money(day.total)} ${mark(totalProv(day))}</td></tr></tbody></table>`;
+    <tr class="total"><td>Total</td>${tot(c)}${tot(home)}${tot(day)}</tr></tbody></table>`;
 }
 const summaryHtml = (text) => `<summary>${ic("chevron-right", "chev")}${text}</summary>`;
 function detailHtml(r) {
   const c = r.cost_breakdown, rt = r.round_trip, s = rt && rt.savings_vs_drive;
-  const tile = (k, amount, prov) => `<div class="tile"><div class="k">${k}</div><div class="v">${money(amount)}</div>${word(prov)}</div>`;
-  const saveVal = (e, unit) => e.amount === null ? `<span>unknown ${unit} ${word(e.provenance)}</span>`
-    : `<span>${e.amount >= 0 ? "" : "costs more: "}${money(Math.abs(e.amount))} ${unit} ${word(e.provenance)}</span>`;
+  const tile = (k, amount, prov) => `<div class="tile"><div class="k">${k}</div><div class="v">${val(money(amount), prov)}</div>${word(prov)}</div>`;
+  const saveVal = (e, unit) => e.amount === null ? `<span>${val("unknown", e.provenance)} ${unit}</span>`
+    : `<span>${e.amount >= 0 ? "" : "costs more: "}${val(money(Math.abs(e.amount)), e.provenance)} ${unit}</span>`;
   return `<button class="back" type="button" id="detail-back">${ic("arrow-left")}All options</button>
-    ${r.label ? `<div class="badges">${badgesHtml(r)}</div>` : ""}
-    <h2>${esc(r.summary)}</h2>
-    <p class="why">${esc(r.explanation.text)} ${mark(r.explanation.provenance)}</p>
+    ${tagHtml(r)}
+    <h2>${esc(rowTitle(r))}</h2>
+    <div class="sub">${esc(rowSub(r))}</div>
+    <p class="why">${esc(r.explanation.text)} ${word(r.explanation.provenance)}</p>
     <div class="tiles">
       ${tile("One trip", c.total, totalProv(c))}
       ${tile("Per day", rt ? rt.daily_cost_breakdown.total : null, rt ? totalProv(rt.daily_cost_breakdown) : "unknown")}
       ${tile("Per month", rt ? rt.monthly_cost.amount : null, rt ? rt.monthly_cost.provenance : "unknown")}
     </div>
-    <h3>${ic("sun", "sm")} Morning · ${mins(r.total_minutes)} ${mark(timeProv(r.legs))}</h3>
+    <h3>Morning · ${val(mins(r.total_minutes), timeProv(r.legs))}</h3>
     ${stepsHtml(r.legs)}
-    ${rt ? `<details><summary>${ic("chevron-right", "chev")}${ic("moon", "sm")} Evening: ${esc(rt.return_summary)}</summary><div class="body">${stepsHtml(rt.return_legs)}</div></details>`
+    ${rt ? `<details>${summaryHtml(`Evening: ${esc(rt.return_summary)} ${word(timeProv(rt.return_legs))}`)}<div class="body">${stepsHtml(rt.return_legs)}</div></details>`
       : `<p class="hint">No trip home could be planned for this option, so daily and monthly costs are unknown.</p>`}
     <h3>${rt ? "Daily cost" : "One-way cost"}</h3>
     ${breakdownHtml(rt ? rt.daily_cost_breakdown : c, rt ? "Round trip, one day" : "One way")}
@@ -696,7 +764,7 @@ function detailHtml(r) {
         ${tile("Per year", rt.annual_cost.amount, rt.annual_cost.provenance)}
         ${s ? `<div class="full save-box"><div class="k">${ic("trending-down", "sm")} Compared with driving all the way</div>
           <div class="vals">${saveVal(s.daily, "a day")}${saveVal(s.monthly, "a month")}${saveVal(s.annual, "a year")}</div></div>` : ""}
-        <div class="full hint">${esc(rt.monthly_cost.note)}</div>
+        <div class="full hint">${esc(rt.monthly_cost.note)} ${word(rt.monthly_cost.provenance)}</div>
       </div>` : ""}
     ${r.warnings.length ? `<details>${summaryHtml(`${ic("triangle-alert", "sm")} Notes and warnings (${r.warnings.length})`)}<div class="body"><ul class="plain">${
       r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div></details>` : ""}`;
@@ -710,6 +778,7 @@ function openDetail(idx) {
 }
 function closeDetail() {
   $("detail").hidden = true; $("list").hidden = false; $("results-controls").hidden = !current.length; $("status").hidden = false;
+  renderChart();
   const row = $("list").querySelector(`[data-idx="${selected}"]`);
   if (row) row.focus();
 }
@@ -742,7 +811,7 @@ function setPeriod(p) {
 }
 $("period").addEventListener("click", (e) => {
   const b = e.target.closest("[data-period]");
-  if (b) { setPeriod(b.dataset.period); renderRows(); }
+  if (b) { setPeriod(b.dataset.period); renderRows(); renderChart(); }
 });
 
 // ---- Search ---------------------------------------------------------------------------------
@@ -777,12 +846,12 @@ async function search() {
     if (ticket !== inflight) return;
     lastQuery = { origin: body.origin, destination: body.destination };
     current = data.routes; selected = 0; sortOptions = data.sort_options || [];
-    renderSorts(); renderRows();
+    renderSorts(); renderRows(); renderChart();
     $("detail").hidden = true; $("list").hidden = false; $("status").hidden = false;
     $("results-controls").hidden = !current.length;
     if (!current.length) $("list").innerHTML = `<li class="hint">No options could be computed for this trip. See About and limitations.</li>`;
     $("disclaimers").innerHTML = data.disclaimers.map((t) => `<li>${esc(t)}</li>`).join("");
-    $("status").textContent = `${current.length} options · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    $("status").textContent = `${current.length} options · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
     if (current.length) drawRoutes(current, 0); else layer.clearLayers();
   } catch (err) {
     if (ticket !== inflight) return;
@@ -792,6 +861,7 @@ async function search() {
   }
 }
 $("form").addEventListener("submit", (e) => { e.preventDefault(); setPeriod("trip"); search(); });
+search();  // open on a comparison, never a blank page
 </script>
 </body>
 </html>
