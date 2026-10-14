@@ -8,127 +8,438 @@
 <link rel="stylesheet" href="/static/leaflet/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
 <style>
+  /* Public Sans (SIL OFL 1.1, USWDS) vendored as variable woff2 — see /static/fonts/OFL.txt. */
+  @font-face { font-family: "Public Sans"; font-style: normal; font-weight: 100 900; font-display: swap;
+    src: url("/static/fonts/public-sans-latin-wght-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Public Sans"; font-style: italic; font-weight: 100 900; font-display: swap;
+    src: url("/static/fonts/public-sans-latin-wght-italic.woff2") format("woff2"); }
+
+  /* Neutral chrome. Color is reserved for meaning: travel mode, tags, savings, data status. */
   :root {
-    --bg: #f4f6f9; --panel: #ffffff; --ink: #0f172a; --muted: #5b6577; --line: #e3e7ee;
-    --brand: #1d4ed8; --brand-ink: #ffffff; --win: #0f8a4b; --win-bg: #e8f6ee;
-    --car: #e8590c; --rail: #1d4ed8; --walk: #64748b; --subway: #0f8a4b;
-    --sched-bg: #e0eaff; --sched: #1e40af; --est-bg: #fff3d6; --est: #8a5a00;
-    --unk-bg: #fde4e4; --unk: #b42318;
+    --bg: #f5f6f7; --panel: #ffffff; --ink: #1b1f24; --ink-2: #3d434b; --muted: #646b74;
+    --line: #e3e5e8; --soft: #eef0f2; --focus: #1b1f24;
+    --car: #d9480f; --rail: #1c64d1; --subway: #2b8a3e; --walk: #868e96; --wait: #d5d9de;
+    --good: #2b8a3e; --good-bg: #e9f6ec;
+    --p-scheduled: #3d434b; --p-estimated: #a85a00; --p-unknown: #c92a2a; --p-other: #6741d9;
+    --radius: 10px;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
-  header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: var(--ink); color: #fff; }
-  header .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
-  header .logo span { color: #7aa2ff; }
-  header .corridor { font-size: 14px; color: #c7d0e0; }
-  main { display: grid; grid-template-columns: 460px 1fr; height: calc(100% - 56px); }
-  aside { overflow-y: auto; padding: 16px; border-right: 1px solid var(--line); }
-  #map { height: 100%; background: #cfe3f3; }  /* water colour shows through offline */
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-  form.card { display: grid; gap: 10px; margin-bottom: 14px; }
-  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  select, input { width: 100%; padding: 9px 10px; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  button { padding: 11px; font: inherit; font-weight: 700; border: 0; border-radius: 8px; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
-  button:disabled { opacity: 0.6; cursor: progress; }
-  #status { font-size: 13px; color: var(--muted); min-height: 18px; }
-  #status.error { color: var(--unk); }
-  .option { margin-bottom: 12px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
-  .option:hover { box-shadow: 0 2px 10px rgba(15,23,42,.08); }
-  .option.selected { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; }
-  .option.winner { background: var(--win-bg); border-color: var(--win); }
-  .option.winner.selected { box-shadow: 0 0 0 2px var(--win) inset; }
-  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-  .badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: #fff; }
-  .badge.best { background: var(--win); }
-  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .summary { font-weight: 700; font-size: 16px; }
-  .totals { display: flex; gap: 14px; text-align: right; white-space: nowrap; }
-  .totals .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  .cost { font-size: 22px; font-weight: 800; }
-  .cost.day { color: var(--brand); }
-  .mins { color: var(--muted); font-size: 14px; }
-  .explain { margin: 6px 0 8px; font-size: 14px; }
-  .timeline { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-  .timeline b { color: var(--ink); font-weight: 600; }
+  body { font: 15px/1.45 "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg); }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .i { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
+  .i.sm { width: 14px; height: 14px; vertical-align: -2px; }
+
+  header.top { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    background: var(--panel); border-bottom: 1px solid var(--line); position: relative; z-index: 1001; }
+  .logo { font-weight: 800; font-size: 19px; letter-spacing: -0.02em; }
+  .corridor { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .icon-btn { display: inline-grid; place-items: center; width: 38px; height: 38px; flex: none; border: 0;
+    border-radius: 999px; background: transparent; cursor: pointer; color: var(--ink-2); }
+  .icon-btn:hover { background: var(--soft); }
+
+  main { display: grid; grid-template-columns: 440px minmax(0, 1fr); height: calc(100% - 56px); }
+  aside { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--panel);
+    border-right: 1px solid var(--line); }
+  .view { padding: 14px 16px 8px; flex: 1 0 auto; }
+  #map { height: 100%; background: #dfe3e8; }  /* neutral water colour shows through offline */
+  .leaflet-tile-pane { filter: grayscale(1) contrast(0.92) brightness(1.04); }
+
+  /* Search card */
+  .search { border: 1px solid var(--line); border-radius: 14px; padding: 12px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
+  #ask:empty { display: none; }  /* slot for the natural-language input another change adds */
+  #ask { margin: -2px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .route-fields { display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px; gap: 0 8px; align-items: center; }
+  .rail { display: grid; justify-items: center; align-self: stretch; padding: 18px 0; }
+  .rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-2); }
+  .rail .dot.end { background: var(--ink-2); border-radius: 2px; }
+  .rail .line { width: 0; border-left: 2px dotted var(--walk); }
+  .fields { display: grid; gap: 8px; min-width: 0; }
+  .field { display: grid; gap: 2px; min-width: 0; }
+  .field > span, .label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  select, input[type=datetime-local], input[type=time] { width: 100%; min-width: 0; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 10px; }
+  .when-row .field { flex: 1 1 190px; }
+  .primary { padding: 9px 18px; font-weight: 700; border: 0; border-radius: 8px; background: var(--ink);
+    color: #fff; cursor: pointer; }
+  .primary:disabled { opacity: .6; cursor: progress; }
+  .ghost { padding: 8px 14px; font-weight: 600; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink-2); cursor: pointer; }
+  .chip:hover { background: var(--soft); }
+
+  /* Results controls */
+  .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 14px 0 6px; }
+  .tabs { display: flex; gap: 2px; overflow-x: auto; }
+  .tab { padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: none; font-weight: 600;
+    font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .tab[aria-selected=true] { color: var(--ink); border-bottom-color: var(--ink); }
+  .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--soft); }
+  .seg button { padding: 4px 10px; border: 0; border-radius: 6px; background: none; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer; }
+  .seg button[aria-pressed=true] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+  .prov-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+  #about-legend { flex-direction: column; font-size: 14px; } #about-legend .prov { white-space: normal; font-weight: 400; }
+  #status { font-size: 13px; color: var(--muted); min-height: 18px; margin: 8px 0 4px; }
+  #status.error { color: var(--p-unknown); }
+
+  /* Provenance marks (N-02): an icon everywhere, the full word in the detail view. */
+  .prov { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .prov .i { width: 14px; height: 14px; }
+  .prov.scheduled, .prov.live { color: var(--p-scheduled); }
+  .prov.estimated { color: var(--p-estimated); }
+  .prov.unknown { color: var(--p-unknown); }
+  .prov.user_reported, .prov.ai_generated { color: var(--p-other); }
+
+  /* Ranked rows */
+  .rows { list-style: none; margin: 0; padding: 0; }
+  .row { display: grid; gap: 6px; padding: 12px 10px 12px 12px; border-bottom: 1px solid var(--line);
+    border-left: 3px solid transparent; cursor: pointer; }
+  .row:hover { background: var(--bg); }
+  .row.selected { border-left-color: var(--ink); background: var(--bg); }
+  .row-main { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .name { font-weight: 650; font-size: 15px; line-height: 1.3; min-width: 0; }
+  .num { text-align: right; white-space: nowrap; }
+  .num b { font-size: 19px; font-weight: 750; letter-spacing: -0.01em; }
+  .num small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); }
+  .badge.best { background: var(--good); border-color: var(--good); color: #fff; }
+  .bar { display: flex; height: 8px; gap: 2px; border-radius: 4px; overflow: hidden; }
+  .bar span { min-width: 3px; }
+  .seg-car { background: var(--car); } .seg-rail { background: var(--rail); } .seg-subway { background: var(--subway); }
+  .seg-walk { background: var(--walk); }
+  .seg-wait { background: repeating-linear-gradient(135deg, var(--wait) 0 3px, #fff 3px 5px); }
+  .meta { font-size: 13px; color: var(--muted); }
+  .meta .save { color: var(--good); font-weight: 650; }
+
+  /* Detail */
+  .back { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; margin: 0 0 10px -6px;
+    border: 0; border-radius: 8px; background: none; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+  .back:hover { background: var(--soft); }
+  h2 { font-size: 19px; line-height: 1.25; margin: 8px 0 6px; letter-spacing: -0.01em; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; }
+  .why { margin: 0 0 12px; color: var(--ink-2); }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tile { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
+  .tile .k { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .tile .v { font-size: 20px; font-weight: 750; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--soft); align-items: start; }
+  .steps li:first-child { border-top: 0; }
+  .mode-ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+  .mode-ic .i { width: 15px; height: 15px; }
+  .mode-ic.car { background: var(--car); } .mode-ic.rail { background: var(--rail); }
+  .mode-ic.subway { background: var(--subway); } .mode-ic.walk { background: var(--walk); }
+  .step-t { font-weight: 600; } .step-s { font-size: 13px; color: var(--muted); }
+  .step-r { font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
+  details { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+  details > summary { display: flex; align-items: center; gap: 6px; padding: 9px 12px; cursor: pointer; font-weight: 600; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary .chev { transition: transform .15s; color: var(--muted); }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  details > .body { padding: 0 12px 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
-  td.amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px; }
-  th { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: right; padding: 0 0 4px 8px; }
-  th:first-child { text-align: left; padding-left: 0; }
-  td.amt.day, th.day { color: var(--brand); font-weight: 700; }
-  .home { font-size: 13px; color: var(--muted); margin: -2px 0 8px; }
-  .home b { color: var(--ink); font-weight: 600; }
-  .periods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--bg); font-size: 14px; }
-  .periods .big { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .periods .save { color: var(--win); }
-  .periods .full { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
-  td .note { display: block; font-size: 12px; color: var(--muted); }
-  .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: .03em; }
-  .chip.scheduled { background: var(--sched-bg); color: var(--sched); }
-  .chip.estimated { background: var(--est-bg); color: var(--est); }
-  .chip.unknown { background: var(--unk-bg); color: var(--unk); }
-  details { margin-top: 8px; font-size: 13px; color: var(--muted); }
-  details li { margin: 2px 0; }
-  .disclaimers { font-size: 12px; color: var(--muted); padding: 4px 4px 20px; }
+  td, th { padding: 6px 0; border-top: 1px solid var(--soft); vertical-align: top; text-align: left; }
+  th { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; border-top: 0; }
+  .amt { text-align: right; white-space: nowrap; padding-left: 8px; }
+  td .note { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  tr.total td { font-weight: 750; border-top: 1px solid var(--line); }
+  .periods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .periods .full { grid-column: 1 / -1; }
+  .save-box { border-radius: var(--radius); background: var(--good-bg); padding: 8px 10px; }
+  .save-box .k { color: var(--good); font-weight: 700; font-size: 13px; }
+  .save-box .vals { display: flex; flex-wrap: wrap; gap: 2px 14px; font-weight: 650; }
+  .hint { font-size: 12px; color: var(--muted); }
+  ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 4px 0; }
+
+  /* Secondary views */
+  .view-title { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .view-title h2 { margin: 0; }
+  .src { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .src .cat { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .src a { color: var(--ink-2); overflow-wrap: anywhere; }
+  .src .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .verified { color: var(--good); font-weight: 650; }
+  fieldset { border: 0; padding: 0; margin: 14px 0 0; }
+  .radio { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+  footer.foot { padding: 10px 16px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+  .linkish { border: 0; background: none; padding: 0; color: var(--ink-2); text-decoration: underline; cursor: pointer; font-size: inherit; }
+
+  /* Drawer */
+  .scrim { position: fixed; inset: 0; background: rgba(16,24,40,.35); z-index: 1100; }
+  .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); background: var(--panel); z-index: 1101;
+    box-shadow: 4px 0 24px rgba(16,24,40,.18); padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+  .drawer .logo { padding: 6px 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .nav { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 8px; background: none;
+    font-weight: 600; text-align: left; cursor: pointer; color: var(--ink-2); }
+  .nav:hover, .nav[aria-current=page] { background: var(--soft); color: var(--ink); }
+
+  /* Map bits */
   .legend { background: #fff; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.7; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
   .legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
   .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .pin .i { width: 15px; height: 15px; }
   .pin.lot { background: var(--rail); border-radius: 6px; }
   .pin.origin { background: var(--ink); }
-  .pin.dest { background: var(--unk); }
+  .pin.dest { background: var(--p-unknown); }
   .pin.hub { background: #fff; color: var(--rail); border-color: var(--rail); }
+
   @media (max-width: 860px) {
-    main { grid-template-columns: 1fr; grid-template-rows: auto 50vh; height: auto; }
-    aside { border-right: 0; order: 1; }
-    #map { order: 0; height: 50vh; }
+    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 42vh auto; height: auto; }
+    #map { height: 42vh; }
+    aside { border-right: 0; overflow: visible; }
+    .view { padding: 12px 16px 8px; }
+  }
+  @media (max-width: 420px) {
+    .tiles .v { font-size: 17px; }
+    .corridor { display: none; }
   }
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">Way<span>Better</span></div>
+<header class="top">
+  <button class="icon-btn" id="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="drawer"></button>
+  <div class="logo">WayBetter</div>
   <div class="corridor" id="corridor"></div>
 </header>
+
+<div class="scrim" id="scrim" hidden></div>
+<nav class="drawer" id="drawer" aria-label="Menu" hidden>
+  <div class="logo">WayBetter <button class="icon-btn" id="drawer-close" type="button" aria-label="Close menu"></button></div>
+  <button class="nav" type="button" data-view="plan"></button>
+  <button class="nav" type="button" data-view="settings"></button>
+  <button class="nav" type="button" data-view="sources"></button>
+  <button class="nav" type="button" data-view="about"></button>
+</nav>
+
 <main>
-  <aside>
-    <form class="card" id="form">
-      <div><label for="origin">From</label><select id="origin"></select></div>
-      <div><label for="destination">To</label><select id="destination"></select></div>
-      <div class="row">
-        <div><label for="when">Leave at</label><input id="when" type="datetime-local"></div>
-        <div><label for="home">Head home at</label><input id="home" type="time"></div>
+  <aside id="panel">
+    <section class="view" id="view-plan">
+      <form class="search" id="form">
+        <div id="ask"></div>
+        <div class="route-fields">
+          <div class="rail" aria-hidden="true"><span class="dot"></span><span class="line"></span><span class="dot end"></span></div>
+          <div class="fields">
+            <label class="field"><span>From</span><select id="origin"></select></label>
+            <label class="field"><span>To</span><select id="destination"></select></label>
+          </div>
+          <button class="icon-btn" id="swap" type="button" aria-label="Swap From and To" title="Swap From and To"></button>
+        </div>
+        <div class="when-row">
+          <label class="field"><span>Leave at</span><input id="when" type="datetime-local"></label>
+          <button class="primary" id="go" type="submit">Compare</button>
+        </div>
+        <div class="chips" id="chips"></div>
+      </form>
+
+      <div id="results-controls" hidden>
+        <div class="controls">
+          <div class="tabs" role="tablist" aria-label="Rank by" id="sorts"></div>
+          <div class="seg" role="group" aria-label="Show cost per" id="period">
+            <button type="button" data-period="trip" aria-pressed="true">Trip</button>
+            <button type="button" data-period="day" aria-pressed="false">Day</button>
+            <button type="button" data-period="month" aria-pressed="false">Month</button>
+          </div>
+        </div>
+        <div class="prov-legend" id="prov-legend"></div>
       </div>
-      <div><label for="sort">Rank by (morning trip)</label>
-        <select id="sort">
-          <option value="best_overall">Best overall</option>
-          <option value="cheapest">Cheapest</option>
-          <option value="fastest">Fastest</option>
-        </select></div>
-      <button id="go" type="submit">Compare</button>
-      <div id="status"></div>
-    </form>
-    <div id="results"></div>
-    <div class="disclaimers" id="disclaimers"></div>
+      <div id="status" role="status" aria-live="polite"></div>
+      <ol class="rows" id="list" aria-label="Ranked options"></ol>
+      <div id="detail" hidden></div>
+    </section>
+
+    <section class="view" id="view-settings" hidden>
+      <div class="view-title"><button class="back" type="button" data-view="plan"></button></div>
+      <h2>Settings</h2>
+      <p class="hint">Saved in this browser only. The page works the same without saved settings.</p>
+      <label class="field"><span>Head home at</span><input id="set-home" type="time"></label>
+      <p class="hint">Plans the trip home and the daily, monthly and yearly cost. The default comes from the corridor data file.</p>
+      <fieldset>
+        <legend class="label">Tolls paid with</legend>
+        <label class="radio"><input type="radio" name="toll" value="ezpass"> E-ZPass</label>
+        <label class="radio"><input type="radio" name="toll" value="cash"> Cash / toll by mail</label>
+      </fieldset>
+      <div class="settings-actions">
+        <button class="primary" id="settings-done" type="button">Save and compare</button>
+        <button class="ghost" id="settings-reset" type="button">Reset to defaults</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-sources" hidden>
+      <div class="view-title"><button class="back" type="button" data-view="plan"></button></div>
+      <h2>Data sources</h2>
+      <p class="hint">Every price and timetable the cost engine can use, read from the data files on the server: where it came from, when it was retrieved, and its status.</p>
+      <div id="sources"></div>
+    </section>
+
+    <section class="view" id="view-about" hidden>
+      <div class="view-title"><button class="back" type="button" data-view="plan"></button></div>
+      <h2>About and limitations</h2>
+      <p>WayBetter compares driving all the way in with parking at a station and taking the train, door to door, on time and total cost. Every number comes from the server, and each one is marked with where it came from:</p>
+      <div class="prov-legend" id="about-legend"></div>
+      <h3>Limitations for this search</h3>
+      <ul class="plain" id="disclaimers"><li class="hint">The server sends its disclaimers with each comparison. Run one to see them here.</li></ul>
+    </section>
+
+    <footer class="foot">Prices and timetables come from dated agency sources and can change; check before you travel.
+      <button class="linkish" type="button" data-view="about">About and limitations</button></footer>
   </aside>
   <div id="map"></div>
 </main>
+
 <script src="/static/leaflet/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
 <script>
-// Renderer only (N-01): every number, label, ranking and sentence below comes from the API.
+// Renderer only (N-01): every number, label, ranking and sentence below comes from the API or
+// from data the server injected. The page formats, lays out and picks which server number to show.
 const PRESETS = /*__PRESETS__*/null;
 const $ = (id) => document.getElementById(id);
 const CSSV = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ic = (name, cls = "") => `<svg class="i ${cls}" aria-hidden="true" focusable="false"><use href="/static/icons/sprite.svg#${name}"></use></svg>`;
 
+// ---- Provenance (N-02) --------------------------------------------------------------------
+const PROV = {
+  scheduled: { icon: "circle-check", word: "scheduled", hint: "a published timetable or price" },
+  live: { icon: "radio", word: "live", hint: "real-time data" },
+  estimated: { icon: "equal-approximately", word: "estimated", hint: "an average or a derived figure" },
+  unknown: { icon: "circle-help", word: "unknown", hint: "no sourced value" },
+  user_reported: { icon: "user", word: "user reported", hint: "reported by a user" },
+  ai_generated: { icon: "sparkles", word: "AI generated", hint: "phrased by AI from computed numbers" },
+};
+const provOf = (p) => PROV[p] || PROV.unknown;
+// Icon only (lists): the word is the accessible name and the tooltip.
+const mark = (p) => `<span class="prov ${esc(p)}" role="img" aria-label="${esc(provOf(p).word)}" title="${esc(provOf(p).word)}">${ic(provOf(p).icon)}</span>`;
+// Icon + full word (detail view).
+const word = (p) => `<span class="prov ${esc(p)}" title="${esc(provOf(p).word)}: ${esc(provOf(p).hint)}">${ic(provOf(p).icon)}${esc(provOf(p).word)}</span>`;
+// A total is as certain as its least certain part. Display roll-up of the server's own labels
+// for the totals the API sends without a status (CostBreakdown.total, total_minutes); see the
+// PROGRESS backlog item to send these from the server.
+const LEAST_CERTAIN = ["unknown", "ai_generated", "user_reported", "estimated", "live", "scheduled"];
+const COST_ROWS = [["Gas", "gas_or_ev"], ["Parking", "parking"], ["Train / subway", "transit_fare"],
+                   ["Tolls", "tolls"], ["Congestion toll", "congestion_fee"]];
+const totalProv = (c) => LEAST_CERTAIN.find((p) => COST_ROWS.some(([, k]) => c[k].provenance === p)) || "unknown";
+const timeProv = (legs) => LEAST_CERTAIN.find((p) => legs.some((l) => l.time_provenance === p)) || "unknown";
+const legendHtml = (full) => ["scheduled", "estimated", "unknown"].map((p) => full
+  ? `<span class="prov ${p}">${ic(provOf(p).icon)}<span><b>${provOf(p).word}</b>: ${provOf(p).hint}</span></span>`
+  : `<span class="prov ${p}" title="${provOf(p).word}: ${provOf(p).hint}">${ic(provOf(p).icon)}${provOf(p).word}</span>`).join("");
+
+// ---- Formatting ---------------------------------------------------------------------------
+const clock = (iso) => { // server sends local time with offset; show it as-is
+  let [h, m] = iso.slice(11, 16).split(":").map(Number);
+  const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, "0")} ${ap}`;
+};
+const hhmm = (s) => s ? clock(`0000-00-00T${s}`) : "";
+const money = (v) => (v === null || v === undefined) ? "unknown"
+  : `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const mins = (m) => `${Math.round(m)} min`;
+const humanize = (key) => { const s = String(key).replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
+
+// ---- Static chrome --------------------------------------------------------------------------
+$("menu-btn").innerHTML = ic("menu");
+$("drawer-close").innerHTML = ic("x");
+$("swap").innerHTML = ic("arrow-up-down");
+const NAV = { plan: ["map", "Plan a trip"], settings: ["settings", "Settings"], sources: ["database", "Data sources"], about: ["info", "About and limitations"] };
+document.querySelectorAll(".nav").forEach((b) => { const [i, t] = NAV[b.dataset.view]; b.innerHTML = `${ic(i)}${t}`; });
+document.querySelectorAll(".view-title .back").forEach((b) => { b.innerHTML = `${ic("arrow-left")}Back to trip`; });
+$("prov-legend").innerHTML = `<span>Data status:</span>${legendHtml(false)}`;
+$("about-legend").innerHTML = legendHtml(true);
 $("corridor").textContent = PRESETS.corridor;
-for (const [sel, list] of [["origin", PRESETS.origins], ["destination", PRESETS.destinations]]) {
-  for (const p of list) $(sel).add(new Option(p.label, p.id));
-}
-$("when").value = PRESETS.default_departure;
-$("home").value = PRESETS.default_return_time;
 
+const PLACES = [...PRESETS.origins, ...PRESETS.destinations];
+const place = (id) => PLACES.find((p) => p.id === id);
+function fillSelect(sel, list, value) {
+  sel.innerHTML = "";
+  for (const p of list) sel.add(new Option(p.label, p.id));
+  if (value) sel.value = value;
+}
+let fromList = PRESETS.origins, toList = PRESETS.destinations;
+fillSelect($("origin"), fromList); fillSelect($("destination"), toList);
+$("when").value = PRESETS.default_departure;
+$("swap").addEventListener("click", () => {
+  const o = $("origin").value, d = $("destination").value;
+  [fromList, toList] = [toList, fromList];
+  fillSelect($("origin"), fromList, d); fillSelect($("destination"), toList, o);
+});
+
+// ---- Settings (localStorage is a convenience; every access may throw) ----------------------
+const STORE_KEY = "waybetter.settings.v1";
+const DEFAULTS = { home: PRESETS.default_return_time, toll: "ezpass" };
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (s && typeof s === "object") return {
+      home: /^([01]\d|2[0-3]):[0-5]\d$/.test(s.home) ? s.home : DEFAULTS.home,
+      toll: s.toll === "cash" ? "cash" : "ezpass",
+    };
+  } catch (e) { /* storage blocked or corrupt: use defaults */ }
+  return { ...DEFAULTS };
+}
+function saveSettings(s) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (e) { /* not persisted; still applied */ }
+}
+let settings = loadSettings();
+function renderChips() {
+  $("chips").innerHTML =
+    `<button type="button" class="chip" data-view="settings" aria-label="Head home at ${esc(hhmm(settings.home))}, change in Settings">${ic("moon", "sm")}Home ${esc(hhmm(settings.home))}</button>
+     <button type="button" class="chip" data-view="settings" aria-label="Tolls paid with ${settings.toll === "cash" ? "cash" : "E-ZPass"}, change in Settings">${ic("car", "sm")}${settings.toll === "cash" ? "Cash tolls" : "E-ZPass"}</button>`;
+}
+function fillSettingsForm() {
+  $("set-home").value = settings.home;
+  document.querySelectorAll("input[name=toll]").forEach((r) => { r.checked = r.value === settings.toll; });
+}
+renderChips();
+$("settings-done").addEventListener("click", () => {
+  const home = $("set-home").value;
+  settings = { home: home || DEFAULTS.home, toll: document.querySelector("input[name=toll]:checked")?.value === "cash" ? "cash" : "ezpass" };
+  saveSettings(settings); renderChips(); showView("plan"); search();
+});
+$("settings-reset").addEventListener("click", () => { settings = { ...DEFAULTS }; fillSettingsForm(); });
+
+// ---- Data sources (injected server-side from the price files and corridor file) ------------
+$("sources").innerHTML = PRESETS.data_sources.map((s) => `<div class="src">
+  <div class="cat">${esc(s.category)}</div>
+  <div><b>${esc(s.name)}</b></div>
+  <div>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.source || s.url)} ${ic("external-link", "sm")}</a>` : esc(s.source || "No source")}</div>
+  <div class="facts">${word(s.status)}<span>Retrieved ${esc(s.retrieved || "unknown")}</span>
+    ${s.human_verified ? `<span class="verified">${ic("circle-check", "sm")} Human-verified</span>` : `<span>Not yet human-verified</span>`}</div>
+</div>`).join("");
+
+// ---- Views and drawer -----------------------------------------------------------------------
+function openDrawer(open) {
+  $("drawer").hidden = !open; $("scrim").hidden = !open;
+  $("menu-btn").setAttribute("aria-expanded", String(open));
+  if (open) $("drawer").querySelector(".nav").focus(); else $("menu-btn").focus();
+}
+function showView(name) {
+  for (const v of ["plan", "settings", "sources", "about"]) $(`view-${v}`).hidden = v !== name;
+  document.querySelectorAll(".nav").forEach((b) => b.dataset.view === name
+    ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  if (name === "settings") fillSettingsForm();
+  $("panel").scrollTop = 0;
+}
+showView("plan");
+$("menu-btn").addEventListener("click", () => openDrawer(true));
+$("drawer-close").addEventListener("click", () => openDrawer(false));
+$("scrim").addEventListener("click", () => openDrawer(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("drawer").hidden) openDrawer(false); });
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-view]");
+  if (!t || t.classList.contains("row")) return;
+  if (!$("drawer").hidden) openDrawer(false);
+  showView(t.dataset.view);
+});
+
+// ---- Map ------------------------------------------------------------------------------------
 const map = L.map("map", { zoomControl: true }).setView([40.55, -74.3], 9);
 // Offline fallback: Natural Earth state outlines in a pane *below* the tiles. Online, OSM tiles
 // cover it; with no network the tiles fail and this plain basemap shows through.
@@ -136,9 +447,9 @@ const map = L.map("map", { zoomControl: true }).setView([40.55, -74.3], 9);
 map.createPane("basemap").style.zIndex = 150;
 fetch("/static/basemap-ny-nj-ct.geojson").then((r) => r.json()).then((geo) => {
   L.geoJSON(geo, { pane: "basemap", interactive: false,
-    style: { color: "#8a94a6", weight: 1, fillColor: "#f3efe6", fillOpacity: 1 } }).addTo(map);
+    style: { color: "#9aa1ab", weight: 1, fillColor: "#f4f4f2", fillOpacity: 1 } }).addTo(map);
   map.attributionControl.addAttribution("Outlines: Natural Earth");
-});
+}).catch(() => {});
 const OFFLINE = new URLSearchParams(location.search).has("offline");
 if (!OFFLINE) {
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -149,13 +460,13 @@ const legend = L.control({ position: "bottomright" });
 legend.onAdd = () => {
   const d = L.DomUtil.create("div", "legend");
   d.innerHTML = `<div><i style="border-color:${CSSV("--car")}"></i>Drive</div>
-    <div><i style="border-color:${CSSV("--rail")}"></i>NJ TRANSIT rail</div>
+    <div><i style="border-color:${CSSV("--rail")}"></i>Rail</div>
     <div><i style="border-color:${CSSV("--walk")};border-top-style:dotted"></i>Walk / subway</div>`;
   return d;
 };
 legend.addTo(map);
 const layer = L.layerGroup().addTo(map);
-let session = null, current = [];
+const pin = (cls, html) => L.divIcon({ className: "", html: `<div class="pin ${cls}">${html}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
 
 // Google encoded polyline -> [lat, lng] pairs (display only).
 function decode(str) {
@@ -171,108 +482,22 @@ function decode(str) {
   }
   return pts;
 }
-const clock = (iso) => { // server sends local time with offset; show it as-is
-  let [h, m] = iso.slice(11, 16).split(":").map(Number);
-  const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
-  return `${h}:${String(m).padStart(2, "0")} ${ap}`;
-};
-const money = (v) => (v === null || v === undefined) ? "unknown"
-  : `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const chip = (p) => `<span class="chip ${esc(p)}">${esc(p)}</span>`;
-const pin = (cls, text) => L.divIcon({ className: "", html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
-
-async function getSession() {
-  if (session) return session;
-  const r = await fetch("/api/v1/session", { method: "POST" });
-  if (!r.ok) throw new Error(`session ${r.status}`);
-  session = (await r.json()).session_token;
-  return session;
-}
-
-function legText(leg) {
-  const mins = `${Math.round(leg.duration_minutes)} min`;
-  if (leg.mode === "car") return `🚗 <b>Drive</b> ${mins}`;
-  if (leg.mode === "walk") {
-    if (leg.leg_id === "walk-1") return `🅿️ <b>Park &amp; walk</b> ${mins}`;
-    if (leg.leg_id === "home-walk-car") return `🅿️ <b>To car</b> ${mins}`;
-    return `🚶 <b>Walk</b> ${mins}`;
-  }
-  if (leg.route_name === "Subway") return `🚇 <b>Subway</b> ${mins}`;
-  return `🚆 <b>${clock(leg.start_time)}</b> ${esc(leg.route_name)} → <b>${clock(leg.end_time)}</b>`;
-}
-
-const COST_ROWS = [["Gas", "gas_or_ev"], ["Parking", "parking"], ["Train / subway", "transit_fare"],
-                   ["Tolls", "tolls"], ["Congestion toll", "congestion_fee"]];
-const noteHtml = (n) => esc(n).split("; ").join("<br>");
-
-function costTable(c, rt) {
-  const home = rt ? rt.return_cost_breakdown : null, day = rt ? rt.daily_cost_breakdown : null;
-  const head = rt ? `<tr><th></th><th>Morning</th><th>Home</th><th class="day">Day</th></tr>` : "";
-  const rows = COST_ROWS.map(([name, key]) => {
-    const m = c[key], h = home && home[key], d = day && day[key];
-    const prov = d ? d.provenance : m.provenance;
-    const notes = [m.note, h && h.note !== m.note ? `Home: ${h.note}` : null].filter(Boolean);
-    return `<tr><td>${name}${chip(prov)}<span class="note">${notes.map(noteHtml).join("<br>")}</span></td>
-      <td class="amt">${money(m.amount)}</td>${rt ? `<td class="amt">${money(h.amount)}</td><td class="amt day">${money(d.amount)}</td>` : ""}</tr>`;
-  }).join("");
-  const total = `<tr><td><b>Total</b></td><td class="amt"><b>${money(c.total)}</b></td>${rt
-    ? `<td class="amt"><b>${money(home.total)}</b></td><td class="amt day">${money(day.total)}</td>` : ""}</tr>`;
-  return `<table>${head}${rows}${total}</table>`;
-}
-
-function periods(rt) {
-  if (!rt) return "";
-  const s = rt.savings_vs_drive;
-  const saved = (e, unit) => e.amount === null ? `savings ${unit} unknown`
-    : e.amount >= 0 ? `saves ${money(e.amount)}${unit}` : `costs ${money(-e.amount)}${unit} more`;
-  return `<div class="periods">
-    <div>Month${chip(rt.monthly_cost.provenance)}<div class="big">${money(rt.monthly_cost.amount)}</div></div>
-    <div>Year${chip(rt.annual_cost.provenance)}<div class="big">${money(rt.annual_cost.amount)}</div></div>
-    ${s ? `<div class="full save" style="font-size:14px;font-weight:700">vs driving: ${saved(s.daily, "/day")} · ${saved(s.monthly, "/month")} · ${saved(s.annual, "/year")}</div>` : ""}
-    <div class="full">${esc(rt.monthly_cost.note)}</div>
-  </div>`;
-}
-
-function renderCard(r, idx) {
-  const c = r.cost_breakdown, rt = r.round_trip;
-  const labels = (r.label || "").split(" · ").filter(Boolean);
-  const last = r.legs[r.legs.length - 1];
-  return `<div class="card option ${idx === 0 ? "winner selected" : ""}" data-idx="${idx}">
-    <div class="badges">${labels.map((l) => `<span class="badge ${l === "Best overall" ? "best" : ""}">${esc(l)}</span>`).join("")}</div>
-    <div class="head">
-      <div class="summary">${esc(r.summary)}</div>
-      <div class="totals">
-        <div><div class="k">One-way</div><div class="cost">${money(c.total)}</div></div>
-        ${rt ? `<div><div class="k">Round trip / day</div><div class="cost day">${money(rt.daily_cost_breakdown.total)}</div></div>` : ""}
-      </div>
-    </div>
-    <div class="mins">${Math.round(r.total_minutes)} min · arrive ${clock(last.end_time)}${rt ? ` · ${Math.round(rt.daily_minutes)} min a day door to door` : ""}</div>
-    <div class="explain">${esc(r.explanation.text)}</div>
-    <div class="timeline">${r.legs.map(legText).join("<span>→</span>")}</div>
-    ${rt ? `<div class="home"><b>Home:</b> ${esc(rt.return_summary)}</div>
-      <div class="timeline">${rt.return_legs.map(legText).join("<span>→</span>")}</div>` : ""}
-    ${costTable(c, rt)}
-    ${periods(rt)}
-    ${r.warnings.length ? `<details><summary>${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""}</summary><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
-  </div>`;
-}
+const legKind = (leg) => leg.mode === "car" ? "car" : leg.mode === "walk" ? "walk"
+  : leg.route_name === "Subway" ? "subway" : "rail";
 
 function drawRoutes(routes, selected) {
   layer.clearLayers();
   const bounds = [];
-  const origin = PRESETS.origins.find((p) => p.id === $("origin").value);
-  const dest = PRESETS.destinations.find((p) => p.id === $("destination").value);
   routes.forEach((r, idx) => {
     const active = idx === selected;
     for (const leg of r.legs) {
       const pts = leg.polyline ? decode(leg.polyline)
         : [[leg.start_location.lat, leg.start_location.lng], [leg.end_location.lat, leg.end_location.lng]];
       if (pts.length < 2 || (pts[0][0] === pts[1][0] && pts.length === 2 && pts[0][1] === pts[1][1])) continue;
-      const kind = leg.mode === "transit" && leg.route_name === "Subway" ? "subway" : leg.mode;
-      const color = CSSV({ car: "--car", transit: "--rail", walk: "--walk", subway: "--subway" }[kind]);
+      const kind = legKind(leg);
       L.polyline(pts, {
-        color, weight: active ? 6 : 3, opacity: active ? 0.95 : 0.25,
+        color: CSSV({ car: "--car", rail: "--rail", walk: "--walk", subway: "--subway" }[kind]),
+        weight: active ? 6 : 3, opacity: active ? 0.95 : 0.25,
         dashArray: kind === "walk" || kind === "subway" ? "2 8" : null,
       }).addTo(layer);
       if (active) bounds.push(...pts);
@@ -280,59 +505,243 @@ function drawRoutes(routes, selected) {
     if (r.parking) {
       const f = r.parking.facility;
       L.marker([f.location.lat, f.location.lng], { icon: pin("lot", "P"), opacity: active ? 1 : 0.7 })
-        .bindTooltip(`${esc(f.name)}<br>${money(f.price_daily.amount)} · ${esc(f.price_daily.provenance)}`)
+        .bindTooltip(`${esc(f.name)}<br>${money(f.price_daily.amount)} · ${esc(provOf(f.price_daily.provenance).word)}`)
         .addTo(layer);
     }
   });
-  const transit = routes.flatMap((r) => r.legs).find((l) => l.mode === "transit" && l.route_name !== "Subway");
-  if (transit) L.marker([transit.end_location.lat, transit.end_location.lng], { icon: pin("hub", "🚆") })
+  const transit = routes.flatMap((r) => r.legs).find((l) => legKind(l) === "rail");
+  if (transit) L.marker([transit.end_location.lat, transit.end_location.lng], { icon: pin("hub", ic("train-front")) })
     .bindTooltip(esc(transit.end_location.label)).addTo(layer);
+  const origin = lastQuery && lastQuery.origin, dest = lastQuery && lastQuery.destination;
   if (origin) L.marker([origin.lat, origin.lng], { icon: pin("origin", "A") }).bindTooltip(esc(origin.label)).addTo(layer);
   if (dest) L.marker([dest.lat, dest.lng], { icon: pin("dest", "B") }).bindTooltip(esc(dest.label)).addTo(layer);
   if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
 }
 
-function select(idx) {
-  document.querySelectorAll(".option").forEach((el) => el.classList.toggle("selected", Number(el.dataset.idx) === idx));
-  drawRoutes(current, idx);
+// ---- Rows -----------------------------------------------------------------------------------
+let session = null, current = [], selected = 0, sortMode = null, sortOptions = [], period = "trip", lastQuery = null;
+
+// Which server number a row shows. Picks a field; never computes one.
+function headline(r) {
+  const rt = r.round_trip;
+  if (period === "trip") return { amount: r.cost_breakdown.total, prov: totalProv(r.cost_breakdown), unit: "one way" };
+  if (period === "day") return rt ? { amount: rt.daily_cost_breakdown.total, prov: totalProv(rt.daily_cost_breakdown), unit: "per day" }
+    : { amount: null, prov: "unknown", unit: "per day" };
+  return rt ? { amount: rt.monthly_cost.amount, prov: rt.monthly_cost.provenance, unit: "per month" }
+    : { amount: null, prov: "unknown", unit: "per month" };
+}
+const badgesHtml = (r) => (r.label || "").split(" · ").filter(Boolean)
+  .map((l) => `<span class="badge ${l === "Best overall" ? "best" : ""}">${esc(l)}</span>`).join("");
+
+const KIND_WORD = { car: "Drive", rail: "Train", subway: "Subway", walk: "Walk", wait: "Wait" };
+function segments(legs) { // the server's legs, plus the gaps between them shown as waiting
+  const out = [];
+  legs.forEach((leg, i) => {
+    if (i > 0) {
+      const gap = (Date.parse(leg.start_time) - Date.parse(legs[i - 1].end_time)) / 60000;
+      if (gap >= 1) out.push({ kind: "wait", minutes: gap });
+    }
+    out.push({ kind: legKind(leg), minutes: leg.duration_minutes });
+  });
+  return out;
+}
+function barHtml(r, longest) {
+  const segs = segments(r.legs);
+  const label = segs.map((s) => `${KIND_WORD[s.kind]} ${mins(s.minutes)}`).join(", ");
+  return `<div class="bar" role="img" aria-label="${esc(label)}" style="width:${(100 * r.total_minutes / longest).toFixed(1)}%">${
+    segs.map((s) => `<span class="seg-${s.kind}" style="flex:${s.minutes} 1 0" title="${esc(KIND_WORD[s.kind])} ${mins(s.minutes)}"></span>`).join("")}</div>`;
+}
+function savedText(e, unit) {
+  if (!e) return "";
+  if (e.amount === null) return `savings ${unit} unknown ${mark(e.provenance)}`;
+  return e.amount >= 0 ? `saves ${money(e.amount)}${unit} ${mark(e.provenance)}` : `costs ${money(-e.amount)}${unit} more ${mark(e.provenance)}`;
+}
+function metaHtml(r) {
+  const parts = [`${mins(r.total_minutes)} ${mark(timeProv(r.legs))}`];
+  const train = r.legs.find((l) => legKind(l) === "rail");
+  const last = r.legs[r.legs.length - 1];
+  if (train) parts.push(`${clock(train.start_time)} → ${clock(train.end_time)} train ${mark(train.time_provenance)}`);
+  else if (last) parts.push(`arrive ${clock(last.end_time)} ${mark(last.time_provenance)}`);
+  const s = r.round_trip && r.round_trip.savings_vs_drive;
+  if (s) parts.push(`<span class="save">${period === "month" ? savedText(s.monthly, "/month") : savedText(s.daily, "/day")}</span>`);
+  return parts.join(" · ");
+}
+function renderRows() {
+  const longest = Math.max(...current.map((r) => r.total_minutes), 1);
+  $("list").innerHTML = current.map((r, idx) => {
+    const h = headline(r);
+    return `<li class="row ${idx === selected ? "selected" : ""}" data-idx="${idx}" tabindex="0" role="button"
+        aria-label="${esc(r.summary)}: ${esc(money(h.amount))} ${h.unit}. Open details">
+      ${r.label ? `<div class="badges">${badgesHtml(r)}</div>` : ""}
+      <div class="row-main"><div class="name">${esc(r.summary)}</div>
+        <div class="num"><b>${money(h.amount)}</b> ${mark(h.prov)}<small>${h.unit}</small></div></div>
+      ${barHtml(r, longest)}
+      <div class="meta">${metaHtml(r)}</div>
+    </li>`;
+  }).join("");
 }
 
-$("results").addEventListener("click", (e) => {
-  const card = e.target.closest(".option");
-  if (card && !e.target.closest("details")) select(Number(card.dataset.idx));
+// ---- Detail ---------------------------------------------------------------------------------
+function stepTitle(leg) {
+  const k = legKind(leg);
+  if (k === "car") return leg.end_location.label ? `Drive to ${esc(leg.end_location.label)}` : "Drive";
+  if (k === "walk") {
+    if (leg.leg_id === "walk-1") return "Park and walk to the platform";
+    if (leg.leg_id === "home-walk-car") return "Walk back to the car";
+    return leg.end_location.label ? `Walk to ${esc(leg.end_location.label)}` : "Walk";
+  }
+  if (k === "subway") return "Subway";
+  return `${esc(leg.route_name || "Train")}${leg.end_location.label ? ` to ${esc(leg.end_location.label)}` : ""}`;
+}
+const MODE_ICON = { car: "car", rail: "train-front", subway: "tram-front", walk: "footprints" };
+function stepsHtml(legs) {
+  return `<ol class="steps">${legs.map((leg) => {
+    const k = legKind(leg);
+    const sub = [leg.distance_miles ? `${leg.distance_miles} mi` : "", leg.headsign ? `toward ${esc(leg.headsign)}` : ""].filter(Boolean).join(" · ");
+    return `<li><span class="mode-ic ${k}">${ic(MODE_ICON[k])}</span>
+      <div><div class="step-t">${stepTitle(leg)}</div><div class="step-s">${clock(leg.start_time)} – ${clock(leg.end_time)}${sub ? ` · ${sub}` : ""}</div></div>
+      <div class="step-r">${mins(leg.duration_minutes)}<br>${word(leg.time_provenance)}</div></li>`;
+  }).join("")}</ol>`;
+}
+const noteHtml = (n) => esc(n).split("; ").join("<br>");
+function breakdownHtml(c, title) {
+  return `<table><thead><tr><th>${title}</th><th></th><th class="amt">Cost</th></tr></thead><tbody>${
+    COST_ROWS.map(([name, key]) => `<tr><td>${name}</td><td>${word(c[key].provenance)}</td><td class="amt">${money(c[key].amount)}</td></tr>`).join("")}
+    <tr class="total"><td>Total</td><td>${word(totalProv(c))}</td><td class="amt">${money(c.total)}</td></tr></tbody></table>`;
+}
+function splitHtml(c, rt) {
+  const home = rt.return_cost_breakdown, day = rt.daily_cost_breakdown;
+  const rows = COST_ROWS.map(([name, key]) => {
+    const m = c[key], h = home[key], d = day[key];
+    const notes = [m.note, h.note && h.note !== m.note ? `Home: ${h.note}` : null, d.note && d.note !== m.note ? `Day: ${d.note}` : null].filter(Boolean);
+    return `<tr><td>${name}<span class="note">${notes.map(noteHtml).join("<br>")}</span></td>
+      <td class="amt">${money(m.amount)} ${mark(m.provenance)}</td><td class="amt">${money(h.amount)} ${mark(h.provenance)}</td><td class="amt">${money(d.amount)} ${mark(d.provenance)}</td></tr>`;
+  }).join("");
+  return `<table><thead><tr><th></th><th class="amt">Morning</th><th class="amt">Home</th><th class="amt">Day</th></tr></thead><tbody>${rows}
+    <tr class="total"><td>Total</td><td class="amt">${money(c.total)} ${mark(totalProv(c))}</td><td class="amt">${money(home.total)} ${mark(totalProv(home))}</td><td class="amt">${money(day.total)} ${mark(totalProv(day))}</td></tr></tbody></table>`;
+}
+const summaryHtml = (text) => `<summary>${ic("chevron-right", "chev")}${text}</summary>`;
+function detailHtml(r) {
+  const c = r.cost_breakdown, rt = r.round_trip, s = rt && rt.savings_vs_drive;
+  const tile = (k, amount, prov) => `<div class="tile"><div class="k">${k}</div><div class="v">${money(amount)}</div>${word(prov)}</div>`;
+  const saveVal = (e, unit) => e.amount === null ? `<span>unknown ${unit} ${word(e.provenance)}</span>`
+    : `<span>${e.amount >= 0 ? "" : "costs more: "}${money(Math.abs(e.amount))} ${unit} ${word(e.provenance)}</span>`;
+  return `<button class="back" type="button" id="detail-back">${ic("arrow-left")}All options</button>
+    ${r.label ? `<div class="badges">${badgesHtml(r)}</div>` : ""}
+    <h2>${esc(r.summary)}</h2>
+    <p class="why">${esc(r.explanation.text)} ${mark(r.explanation.provenance)}</p>
+    <div class="tiles">
+      ${tile("One trip", c.total, totalProv(c))}
+      ${tile("Per day", rt ? rt.daily_cost_breakdown.total : null, rt ? totalProv(rt.daily_cost_breakdown) : "unknown")}
+      ${tile("Per month", rt ? rt.monthly_cost.amount : null, rt ? rt.monthly_cost.provenance : "unknown")}
+    </div>
+    <h3>${ic("sun", "sm")} Morning · ${mins(r.total_minutes)} ${mark(timeProv(r.legs))}</h3>
+    ${stepsHtml(r.legs)}
+    ${rt ? `<details><summary>${ic("chevron-right", "chev")}${ic("moon", "sm")} Evening: ${esc(rt.return_summary)}</summary><div class="body">${stepsHtml(rt.return_legs)}</div></details>`
+      : `<p class="hint">No trip home could be planned for this option, so daily and monthly costs are unknown.</p>`}
+    <h3>${rt ? "Daily cost" : "One-way cost"}</h3>
+    ${breakdownHtml(rt ? rt.daily_cost_breakdown : c, rt ? "Round trip, one day" : "One way")}
+    ${rt ? `<details>${summaryHtml("Split by trip")}<div class="body">${splitHtml(c, rt)}</div></details>
+      <div class="periods">
+        ${tile("Per month", rt.monthly_cost.amount, rt.monthly_cost.provenance)}
+        ${tile("Per year", rt.annual_cost.amount, rt.annual_cost.provenance)}
+        ${s ? `<div class="full save-box"><div class="k">${ic("trending-down", "sm")} Compared with driving all the way</div>
+          <div class="vals">${saveVal(s.daily, "a day")}${saveVal(s.monthly, "a month")}${saveVal(s.annual, "a year")}</div></div>` : ""}
+        <div class="full hint">${esc(rt.monthly_cost.note)}</div>
+      </div>` : ""}
+    ${r.warnings.length ? `<details>${summaryHtml(`${ic("triangle-alert", "sm")} Notes and warnings (${r.warnings.length})`)}<div class="body"><ul class="plain">${
+      r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div></details>` : ""}`;
+}
+function openDetail(idx) {
+  select(idx);
+  $("detail").innerHTML = detailHtml(current[idx]);
+  $("detail").hidden = false; $("list").hidden = true; $("results-controls").hidden = true; $("status").hidden = true;
+  $("panel").scrollTop = 0; window.scrollTo({ top: 0 });
+  $("detail-back").focus();
+}
+function closeDetail() {
+  $("detail").hidden = true; $("list").hidden = false; $("results-controls").hidden = !current.length; $("status").hidden = false;
+  const row = $("list").querySelector(`[data-idx="${selected}"]`);
+  if (row) row.focus();
+}
+function select(idx) {
+  selected = idx;
+  document.querySelectorAll(".row").forEach((el) => el.classList.toggle("selected", Number(el.dataset.idx) === idx));
+  drawRoutes(current, idx);
+}
+$("list").addEventListener("click", (e) => { const row = e.target.closest(".row"); if (row) openDetail(Number(row.dataset.idx)); });
+$("list").addEventListener("keydown", (e) => {
+  const row = e.target.closest(".row");
+  if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDetail(Number(row.dataset.idx)); }
+});
+$("detail").addEventListener("click", (e) => { if (e.target.closest("#detail-back")) closeDetail(); });
+
+// ---- Sort tabs (from response.sort_options; ranking stays on the server) and period toggle ---
+function renderSorts() {
+  const active = sortMode || sortOptions[0];
+  $("sorts").innerHTML = sortOptions.map((k) =>
+    `<button type="button" class="tab" role="tab" data-sort="${esc(k)}" aria-selected="${k === active}">${esc(humanize(k))}</button>`).join("");
+}
+$("sorts").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-sort]");
+  if (!t || t.dataset.sort === (sortMode || sortOptions[0])) return;
+  sortMode = t.dataset.sort; renderSorts(); search();
+});
+$("period").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-period]");
+  if (!b) return;
+  period = b.dataset.period;
+  $("period").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderRows();
 });
 
-$("form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const o = PRESETS.origins.find((p) => p.id === $("origin").value);
-  const d = PRESETS.destinations.find((p) => p.id === $("destination").value);
+// ---- Search ---------------------------------------------------------------------------------
+async function getSession() {
+  if (session) return session;
+  const r = await fetch("/api/v1/session", { method: "POST" });
+  if (!r.ok) throw new Error(`session ${r.status}`);
+  session = (await r.json()).session_token;
+  return session;
+}
+let inflight = 0;
+async function search() {
+  const o = place($("origin").value), d = place($("destination").value);
+  if (!o || !d) return;
+  const ticket = ++inflight;
   $("go").disabled = true; $("status").className = ""; $("status").textContent = "Comparing…";
   try {
     const body = {
       origin: { lat: o.lat, lng: o.lng, label: o.label },
       destination: { lat: d.lat, lng: d.lng, label: d.label },
       time_mode: "leave_at", target_time: $("when").value + ":00",
-      return_time: $("home").value || null,
-      preferences: { sort_mode: $("sort").value },
+      return_time: settings.home || null,
+      vehicle_profile: { toll_payment: settings.toll },
+      ...(sortMode ? { preferences: { sort_mode: sortMode } } : {}),
     };
-    let r = await fetch("/api/v1/trip/search", { method: "POST",
+    const post = async () => fetch("/api/v1/trip/search", { method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify(body) });
-    if (r.status === 401) { session = null; r = await fetch("/api/v1/trip/search", { method: "POST",
-      headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify(body) }); }
+    let r = await post();
+    if (r.status === 401) { session = null; r = await post(); }
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
-    current = data.routes;
-    $("results").innerHTML = current.length ? current.map(renderCard).join("")
-      : `<div class="card">No options could be computed for this trip. See the notes below.</div>`;
-    $("disclaimers").innerHTML = data.disclaimers.map((t) => `<div>• ${esc(t)}</div>`).join("");
+    if (ticket !== inflight) return;
+    lastQuery = { origin: body.origin, destination: body.destination };
+    current = data.routes; selected = 0; sortOptions = data.sort_options || [];
+    renderSorts(); renderRows();
+    $("detail").hidden = true; $("list").hidden = false; $("status").hidden = false;
+    $("results-controls").hidden = !current.length;
+    if (!current.length) $("list").innerHTML = `<li class="hint">No options could be computed for this trip. See About and limitations.</li>`;
+    $("disclaimers").innerHTML = data.disclaimers.map((t) => `<li>${esc(t)}</li>`).join("");
     $("status").textContent = `${current.length} options · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
     if (current.length) drawRoutes(current, 0); else layer.clearLayers();
   } catch (err) {
+    if (ticket !== inflight) return;
     $("status").className = "error"; $("status").textContent = `Could not compare: ${err.message}`;
   } finally {
-    $("go").disabled = false;
+    if (ticket === inflight) $("go").disabled = false;
   }
-});
+}
+$("form").addEventListener("submit", (e) => { e.preventDefault(); search(); });
 </script>
 </body>
 </html>
