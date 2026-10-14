@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). Steps 1–6 done: comparison API + Leaflet page, verified with outbound network blocked.
+  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,20 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 7, DEMO.md):** Wrote [DEMO.md](DEMO.md): start command
+  (verified from a clean `env -i` shell on a spare port: health, page, docs, and a search that
+  matches the documented numbers), first-time setup, morning-of checklist, a ~6-minute talk
+  track for three scenarios, expected results for all three origins (Thu 10/15 07:00),
+  one-paragraph architecture + diagram, a data-source table with each value's status,
+  limitations, Phase 2, and short answers to likely questions. Human note: the interview is
+  virtual on home internet, so the step 6 offline path is a backup only.
+  **Bug found while collecting expected results:** Plainsboro routes enter the Turnpike at
+  **Exit 8A**, which had rates but no snap coordinates, so its toll came back `unknown`
+  (correctly flagged, not guessed). Added 8A (40.3550, -74.4711, taken from the routing engine's
+  merge point) to `data/tolls/njta_turnpike.yaml`; Plainsboro → Times Square drive is now $77.08
+  with Turnpike 8A→16E $11.45. 101 tests green. **Open for the human:** spot-check fares, lot
+  rates and Turnpike rates (CLAUDE.md); set DEMO-SPRINT.md to CLOSED after the interview.
 
 - **2026-10-14 — Claude (DEMO SPRINT step 6, offline):** `make warm-cache`
   (`app/trips/warm.py`) runs every preset origin × destination and caches the 18 driving routes

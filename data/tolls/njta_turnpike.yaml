@@ -25,6 +25,7 @@ peak_windows:   # based on time of ENTRY
   weekday: [["07:00", "09:00"], ["16:30", "18:30"]]
   weekend: [["00:00", "24:00"]]
 interchanges:   # entry snapping points (OSM geometry via the routing engine), snap radius 3 km
+  - {id: "8A", name: "NJ 32, Cranbury/Jamesburg", lat: 40.3550, lon: -74.4711}
   - {id: "9", name: "NJ 18, New Brunswick", lat: 40.4808, lon: -74.4026}
 rates:
   - {entry: "9",  exit: "16E", ezpass_peak: 10.29, nj_ezpass_off_peak: 7.72, cash: 10.40}
