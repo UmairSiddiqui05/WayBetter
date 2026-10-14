@@ -14,6 +14,9 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## In progress
 
+- **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Step 1
+  (pull + inventory + corridor recommendation) done; awaiting the human's corridor pick.
+
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
   exercised against the three real MTA feeds. Still open: PATH + CT rail feed URLs (hosts
@@ -149,6 +152,20 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 1, inventory):** Fast-forwarded local `main` 10 commits
+  to `ec72f11` (PRs #1/#2), then committed the sprint docs (`a7efccb`, D-18). No code changed.
+  **What ingestion produces — files only, no DB tables:** GTFS zips in `data/gtfs/*.zip`
+  (gitignored — *not on disk in this clone*, must be re-fetched), committed provenance sidecars
+  `data/gtfs/{mta_subway,mta_lirr,mta_mnr}.meta.json`, and the canonical station table
+  `data/regions/nyc-metro-stations.csv` (737 stations). Ingestion validates feeds and extracts
+  stations only; it does **not** read `stop_times`/`calendar_dates`, so the demo's GTFS
+  `TransitProvider` is new code. `data/fares`, `data/tolls`, `data/parking` are empty.
+  **Checked live:** all three MTA feed URLs return 200 (MNR and LIRR republished today, so a
+  re-fetch will produce new feed versions than the committed sidecars); the public OSRM demo
+  server answered a Westchester → Midtown route. **Contract note:** `/trip/search` requires the
+  `sessionToken` scheme, so a minimal `POST /session` is needed (as DEMO-SPRINT.md anticipates).
+  **Recommendation:** Metro-North Harlem Line → Grand Central unless NJT portal access exists.
 
 - **2026-08-04 — Claude (A2, Data Ingestion — keyless subset):** Branch `agent/a2-ingestion`,
   built on `agent/a1-scaffold`. Requirement IDs: **N-03, N-08, N-09**. Scope was deliberately
