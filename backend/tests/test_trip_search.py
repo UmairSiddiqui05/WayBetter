@@ -197,3 +197,16 @@ def test_unknown_request_fields_are_rejected(app: FastAPI) -> None:
     response = client.post("/api/v1/trip/search", json=body, headers={"X-Session-Token": token})
 
     assert response.status_code == 422
+
+
+def test_demo_page_is_served_with_presets_but_stays_off_the_contract(
+    app: FastAPI, service: TripSearchService
+) -> None:
+    app.dependency_overrides[get_trip_service] = lambda: service
+    page = TestClient(app).get("/")
+    app.dependency_overrides.clear()
+
+    assert page.status_code == 200
+    assert "Princeton (Nassau St)" in page.text  # injected from the corridor data file
+    assert "/*__PRESETS__*/" not in page.text
+    assert "/" not in app.openapi()["paths"]

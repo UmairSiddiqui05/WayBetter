@@ -82,6 +82,14 @@ class TripSearchService:
         self._transit = transit
         self._tz = ZoneInfo(region.timezone)
 
+    @property
+    def corridor(self) -> Corridor:
+        return self._corridor
+
+    @property
+    def timezone(self) -> ZoneInfo:
+        return self._tz
+
     # -- entry point ---------------------------------------------------------------
 
     def search(self, request: TripSearchRequest, now: datetime) -> TripSearchResponse:
@@ -518,7 +526,7 @@ class TripSearchService:
             "Train times are NJ TRANSIT's published schedule, not real-time.",
             "Drive times are free-flow estimates from OpenStreetMap data "
             "(© OpenStreetMap contributors); they ignore live traffic.",
-            f"Fuel only: {vehicle.cost_scope}",
+            f"Driving cost is {vehicle.cost_scope[0].lower()}{vehicle.cost_scope[1:]}",
             "Park-and-ride parking assumes the car stays "
             f"{self._corridor.assumed_parking_hours:g} hours.",
             "Tolls assume E-ZPass unless cash is selected; "

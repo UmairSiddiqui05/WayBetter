@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WayBetter — Park &amp; Ride Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root {
+    --bg: #f4f6f9; --panel: #ffffff; --ink: #0f172a; --muted: #5b6577; --line: #e3e7ee;
+    --brand: #1d4ed8; --brand-ink: #ffffff; --win: #0f8a4b; --win-bg: #e8f6ee;
+    --car: #e8590c; --rail: #1d4ed8; --walk: #64748b; --subway: #0f8a4b;
+    --sched-bg: #e0eaff; --sched: #1e40af; --est-bg: #fff3d6; --est: #8a5a00;
+    --unk-bg: #fde4e4; --unk: #b42318;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: var(--ink); color: #fff; }
+  header .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+  header .logo span { color: #7aa2ff; }
+  header .corridor { font-size: 14px; color: #c7d0e0; }
+  main { display: grid; grid-template-columns: 460px 1fr; height: calc(100% - 56px); }
+  aside { overflow-y: auto; padding: 16px; border-right: 1px solid var(--line); }
+  #map { height: 100%; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  form.card { display: grid; gap: 10px; margin-bottom: 14px; }
+  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  select, input { width: 100%; padding: 9px 10px; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { padding: 11px; font: inherit; font-weight: 700; border: 0; border-radius: 8px; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  #status { font-size: 13px; color: var(--muted); min-height: 18px; }
+  #status.error { color: var(--unk); }
+  .option { margin-bottom: 12px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+  .option:hover { box-shadow: 0 2px 10px rgba(15,23,42,.08); }
+  .option.selected { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; }
+  .option.winner { background: var(--win-bg); border-color: var(--win); }
+  .option.winner.selected { box-shadow: 0 0 0 2px var(--win) inset; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: #fff; }
+  .badge.best { background: var(--win); }
+  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .summary { font-weight: 700; font-size: 16px; }
+  .totals { text-align: right; white-space: nowrap; }
+  .cost { font-size: 22px; font-weight: 800; }
+  .mins { color: var(--muted); font-size: 14px; }
+  .explain { margin: 6px 0 8px; font-size: 14px; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .timeline b { color: var(--ink); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td.amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px; }
+  td .note { display: block; font-size: 12px; color: var(--muted); }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .chip.scheduled { background: var(--sched-bg); color: var(--sched); }
+  .chip.estimated { background: var(--est-bg); color: var(--est); }
+  .chip.unknown { background: var(--unk-bg); color: var(--unk); }
+  details { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  details li { margin: 2px 0; }
+  .disclaimers { font-size: 12px; color: var(--muted); padding: 4px 4px 20px; }
+  .legend { background: #fff; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.7; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .pin.lot { background: var(--rail); border-radius: 6px; }
+  .pin.origin { background: var(--ink); }
+  .pin.dest { background: var(--unk); }
+  .pin.hub { background: #fff; color: var(--rail); border-color: var(--rail); }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 50vh; height: auto; }
+    aside { border-right: 0; order: 1; }
+    #map { order: 0; height: 50vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Way<span>Better</span></div>
+  <div class="corridor" id="corridor"></div>
+</header>
+<main>
+  <aside>
+    <form class="card" id="form">
+      <div><label for="origin">From</label><select id="origin"></select></div>
+      <div><label for="destination">To</label><select id="destination"></select></div>
+      <div class="row">
+        <div><label for="when">Leave at</label><input id="when" type="datetime-local"></div>
+        <div><label for="sort">Rank by</label>
+          <select id="sort">
+            <option value="best_overall">Best overall</option>
+            <option value="cheapest">Cheapest</option>
+            <option value="fastest">Fastest</option>
+          </select></div>
+      </div>
+      <button id="go" type="submit">Compare</button>
+      <div id="status"></div>
+    </form>
+    <div id="results"></div>
+    <div class="disclaimers" id="disclaimers"></div>
+  </aside>
+  <div id="map"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// Renderer only (N-01): every number, label, ranking and sentence below comes from the API.
+const PRESETS = /*__PRESETS__*/null;
+const $ = (id) => document.getElementById(id);
+const CSSV = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+$("corridor").textContent = PRESETS.corridor;
+for (const [sel, list] of [["origin", PRESETS.origins], ["destination", PRESETS.destinations]]) {
+  for (const p of list) $(sel).add(new Option(p.label, p.id));
+}
+$("when").value = PRESETS.default_departure;
+
+const map = L.map("map", { zoomControl: true }).setView([40.55, -74.3], 9);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
+}).addTo(map);
+const legend = L.control({ position: "bottomright" });
+legend.onAdd = () => {
+  const d = L.DomUtil.create("div", "legend");
+  d.innerHTML = `<div><i style="border-color:${CSSV("--car")}"></i>Drive</div>
+    <div><i style="border-color:${CSSV("--rail")}"></i>NJ TRANSIT rail</div>
+    <div><i style="border-color:${CSSV("--walk")};border-top-style:dotted"></i>Walk / subway</div>`;
+  return d;
+};
+legend.addTo(map);
+const layer = L.layerGroup().addTo(map);
+let session = null, current = [];
+
+// Google encoded polyline -> [lat, lng] pairs (display only).
+function decode(str) {
+  const pts = []; let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const k of [0, 1]) {
+      let shift = 0, result = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = (result & 1) ? ~(result >> 1) : (result >> 1);
+      if (k === 0) lat += d; else lng += d;
+    }
+    pts.push([lat / 1e5, lng / 1e5]);
+  }
+  return pts;
+}
+const clock = (iso) => { // server sends local time with offset; show it as-is
+  let [h, m] = iso.slice(11, 16).split(":").map(Number);
+  const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, "0")} ${ap}`;
+};
+const money = (v) => (v === null || v === undefined) ? "unknown" : `$${v.toFixed(2)}`;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const chip = (p) => `<span class="chip ${esc(p)}">${esc(p)}</span>`;
+const pin = (cls, text) => L.divIcon({ className: "", html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
+
+async function getSession() {
+  if (session) return session;
+  const r = await fetch("/api/v1/session", { method: "POST" });
+  if (!r.ok) throw new Error(`session ${r.status}`);
+  session = (await r.json()).session_token;
+  return session;
+}
+
+function legText(leg) {
+  const mins = `${Math.round(leg.duration_minutes)} min`;
+  if (leg.mode === "car") return `🚗 <b>Drive</b> ${mins}`;
+  if (leg.mode === "walk") return leg.leg_id === "walk-1" ? `🅿️ <b>Park &amp; walk</b> ${mins}` : `🚶 <b>Walk</b> ${mins}`;
+  if (leg.route_name === "Subway") return `🚇 <b>Subway</b> ${mins}`;
+  return `🚆 <b>${clock(leg.start_time)}</b> ${esc(leg.route_name)} → <b>${clock(leg.end_time)}</b>`;
+}
+
+function renderCard(r, idx) {
+  const c = r.cost_breakdown;
+  const labels = (r.label || "").split(" · ").filter(Boolean);
+  const rows = [["Gas", c.gas_or_ev], ["Parking", c.parking], ["Train / subway", c.transit_fare],
+                ["Tolls", c.tolls], ["Congestion toll", c.congestion_fee]]
+    .map(([name, e]) => `<tr><td>${name}${chip(e.provenance)}<span class="note">${esc(e.note).split("; ").join("<br>")}</span></td>
+      <td class="amt">${money(e.amount)}</td></tr>`).join("");
+  const last = r.legs[r.legs.length - 1];
+  return `<div class="card option ${idx === 0 ? "winner selected" : ""}" data-idx="${idx}">
+    <div class="badges">${labels.map((l) => `<span class="badge ${l === "Best overall" ? "best" : ""}">${esc(l)}</span>`).join("")}</div>
+    <div class="head">
+      <div class="summary">${esc(r.summary)}</div>
+      <div class="totals"><div class="cost">${money(c.total)}</div>
+        <div class="mins">${Math.round(r.total_minutes)} min · arrive ${clock(last.end_time)}</div></div>
+    </div>
+    <div class="explain">${esc(r.explanation.text)}</div>
+    <div class="timeline">${r.legs.map(legText).join("<span>→</span>")}</div>
+    <table>${rows}<tr><td><b>Total</b></td><td class="amt"><b>${money(c.total)}</b></td></tr></table>
+    ${r.warnings.length ? `<details><summary>${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""}</summary><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
+  </div>`;
+}
+
+function drawRoutes(routes, selected) {
+  layer.clearLayers();
+  const bounds = [];
+  const origin = PRESETS.origins.find((p) => p.id === $("origin").value);
+  const dest = PRESETS.destinations.find((p) => p.id === $("destination").value);
+  routes.forEach((r, idx) => {
+    const active = idx === selected;
+    for (const leg of r.legs) {
+      const pts = leg.polyline ? decode(leg.polyline)
+        : [[leg.start_location.lat, leg.start_location.lng], [leg.end_location.lat, leg.end_location.lng]];
+      if (pts.length < 2 || (pts[0][0] === pts[1][0] && pts.length === 2 && pts[0][1] === pts[1][1])) continue;
+      const kind = leg.mode === "transit" && leg.route_name === "Subway" ? "subway" : leg.mode;
+      const color = CSSV({ car: "--car", transit: "--rail", walk: "--walk", subway: "--subway" }[kind]);
+      L.polyline(pts, {
+        color, weight: active ? 6 : 3, opacity: active ? 0.95 : 0.25,
+        dashArray: kind === "walk" || kind === "subway" ? "2 8" : null,
+      }).addTo(layer);
+      if (active) bounds.push(...pts);
+    }
+    if (r.parking) {
+      const f = r.parking.facility;
+      L.marker([f.location.lat, f.location.lng], { icon: pin("lot", "P"), opacity: active ? 1 : 0.7 })
+        .bindTooltip(`${esc(f.name)}<br>${money(f.price_daily.amount)} · ${esc(f.price_daily.provenance)}`)
+        .addTo(layer);
+    }
+  });
+  const transit = routes.flatMap((r) => r.legs).find((l) => l.mode === "transit" && l.route_name !== "Subway");
+  if (transit) L.marker([transit.end_location.lat, transit.end_location.lng], { icon: pin("hub", "🚆") })
+    .bindTooltip(esc(transit.end_location.label)).addTo(layer);
+  if (origin) L.marker([origin.lat, origin.lng], { icon: pin("origin", "A") }).bindTooltip(esc(origin.label)).addTo(layer);
+  if (dest) L.marker([dest.lat, dest.lng], { icon: pin("dest", "B") }).bindTooltip(esc(dest.label)).addTo(layer);
+  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function select(idx) {
+  document.querySelectorAll(".option").forEach((el) => el.classList.toggle("selected", Number(el.dataset.idx) === idx));
+  drawRoutes(current, idx);
+}
+
+$("results").addEventListener("click", (e) => {
+  const card = e.target.closest(".option");
+  if (card && !e.target.closest("details")) select(Number(card.dataset.idx));
+});
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const o = PRESETS.origins.find((p) => p.id === $("origin").value);
+  const d = PRESETS.destinations.find((p) => p.id === $("destination").value);
+  $("go").disabled = true; $("status").className = ""; $("status").textContent = "Comparing…";
+  try {
+    const body = {
+      origin: { lat: o.lat, lng: o.lng, label: o.label },
+      destination: { lat: d.lat, lng: d.lng, label: d.label },
+      time_mode: "leave_at", target_time: $("when").value + ":00",
+      preferences: { sort_mode: $("sort").value },
+    };
+    let r = await fetch("/api/v1/trip/search", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify(body) });
+    if (r.status === 401) { session = null; r = await fetch("/api/v1/trip/search", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify(body) }); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
+    current = data.routes;
+    $("results").innerHTML = current.map(renderCard).join("");
+    $("disclaimers").innerHTML = data.disclaimers.map((t) => `<div>• ${esc(t)}</div>`).join("");
+    $("status").textContent = `${current.length} options · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    drawRoutes(current, 0);
+  } catch (err) {
+    $("status").className = "error"; $("status").textContent = `Could not compare: ${err.message}`;
+  } finally {
+    $("go").disabled = false;
+  }
+});
+</script>
+</body>
+</html>

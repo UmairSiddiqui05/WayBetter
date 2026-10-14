@@ -22,6 +22,7 @@ from app.cache import close_redis
 from app.config import API_V1_PREFIX, Settings, get_settings
 from app.db import dispose_engine
 from app.logging import configure_logging
+from app.web import page
 
 API_TITLE = "WayBetter API"
 API_DESCRIPTION = (
@@ -77,6 +78,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     # Contract endpoints (docs/api-spec.yaml). Empty until A3 lands.
     app.include_router(api_router, prefix=API_V1_PREFIX)
+    # Demo page (D-18), outside the versioned contract and excluded from OpenAPI.
+    app.include_router(page.router)
 
     return app
 

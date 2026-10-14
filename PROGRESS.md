@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). Steps 1–4 done: `POST /trip/search` returns a real comparison (2026-10-14 ~17:45 ET).
+  access arrived, 2026-10-14). Steps 1–5 done: real comparison via `POST /trip/search` + Leaflet demo page at `/`.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,20 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 5, demo page):** One static page,
+  `backend/app/web/index.html`, served at `/` by `app/web/page.py` (outside `/api/v1`,
+  `include_in_schema=False`, so the contract is untouched). Origin/destination presets and the
+  default departure (next weekday 07:00 local) are injected server-side from
+  `nyc-metro-demo-corridor.yaml`, so no new API path was needed. Leaflet 1.9.4 from unpkg with SRI
+  hashes (verified against the served files), OSM tiles with attribution. The page only renders
+  the API payload (N-01): server ranking order, server labels, server explanation text, every
+  cost row with its provenance chip (scheduled / estimated / unknown), the leg timeline, notes
+  and disclaimers. Clicking a card redraws the map for that option (drive orange, NJT rail blue,
+  walk/subway dotted, P markers for lots). `.claude/launch.json` runs the API for the app's
+  browser pane. **Verified in the browser** at 1440×900: Princeton → Times Square and
+  Lawrenceville → Bryant Park both render, no console errors. Also fixed the "Fuel only: Fuel
+  only." disclaimer wording. 100 tests green. IDs: F-18 (subset), N-01, N-02.
 
 - **2026-10-14 — Claude (DEMO SPRINT step 4, providers + trip search):** `POST /api/v1/session`
   and `POST /api/v1/trip/search` live, both already in docs/api-spec.yaml (no contract change, no
