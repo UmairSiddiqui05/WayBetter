@@ -14,8 +14,8 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## In progress
 
-- **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Step 1
-  (pull + inventory + corridor recommendation) done; awaiting the human's corridor pick.
+- **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
+  **Metro-North Harlem Line → Grand Central** (human, no NJT portal access). Steps 1–2 done.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -152,6 +152,18 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 2, local run):** Human chose Metro-North Harlem Line →
+  Grand Central. No code changed. Created `backend/.venv` with **Python 3.13** (no 3.12 on this
+  Mac; pyproject allows ≥3.12) via `make install PYTHON=/opt/miniconda3/bin/python3.13`, and
+  `.env` via `make env`. uvicorn boots locally without Docker: `/healthz` 200, `/api/v1/docs`
+  200; `/readyz` 503 `not_ready` (no Postgres/Redis running — expected under D-18; the demo path
+  does not use them). `make fetch-feeds` re-downloaded subway/LIRR/MNR (no per-feed flag exists);
+  sidecars updated to today's feed versions, and `make station-map` rebuilt the station table to
+  match (N-08) — diff verified to touch only `feed_version`/`retrieved_at`, no stop changes.
+  Sanity check: MNR feed spans 2026-10-09 → 2027-05-23; 482 Harlem Line trips run on 10/14–10/15.
+  ruff, mypy strict, 63 tests green. Files: `data/gtfs/*.meta.json`,
+  `data/regions/nyc-metro-stations.csv`, `PROGRESS.md`. IDs: N-08, N-09.
 
 - **2026-10-14 — Claude (DEMO SPRINT step 1, inventory):** Fast-forwarded local `main` 10 commits
   to `ec72f11` (PRs #1/#2), then committed the sprint docs (`a7efccb`, D-18). No code changed.
