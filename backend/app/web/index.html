@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WayBetter — Park &amp; Ride Planner</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<!-- Leaflet 1.9.4 vendored (identical to unpkg, same SRI hash) so the demo runs offline. -->
+<link rel="stylesheet" href="/static/leaflet/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
 <style>
   :root {
     --bg: #f4f6f9; --panel: #ffffff; --ink: #0f172a; --muted: #5b6577; --line: #e3e7ee;
@@ -23,7 +24,7 @@
   header .corridor { font-size: 14px; color: #c7d0e0; }
   main { display: grid; grid-template-columns: 460px 1fr; height: calc(100% - 56px); }
   aside { overflow-y: auto; padding: 16px; border-right: 1px solid var(--line); }
-  #map { height: 100%; }
+  #map { height: 100%; background: #cfe3f3; }  /* water colour shows through offline */
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
   form.card { display: grid; gap: 10px; margin-bottom: 14px; }
   label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -101,8 +102,8 @@
   </aside>
   <div id="map"></div>
 </main>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/static/leaflet/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
 <script>
 // Renderer only (N-01): every number, label, ranking and sentence below comes from the API.
 const PRESETS = /*__PRESETS__*/null;
@@ -116,9 +117,21 @@ for (const [sel, list] of [["origin", PRESETS.origins], ["destination", PRESETS.
 $("when").value = PRESETS.default_departure;
 
 const map = L.map("map", { zoomControl: true }).setView([40.55, -74.3], 9);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
-}).addTo(map);
+// Offline fallback: Natural Earth state outlines in a pane *below* the tiles. Online, OSM tiles
+// cover it; with no network the tiles fail and this plain basemap shows through.
+// (OSM's tile policy forbids pre-downloading tiles, so we do not cache them.)
+map.createPane("basemap").style.zIndex = 150;
+fetch("/static/basemap-ny-nj-ct.geojson").then((r) => r.json()).then((geo) => {
+  L.geoJSON(geo, { pane: "basemap", interactive: false,
+    style: { color: "#8a94a6", weight: 1, fillColor: "#f3efe6", fillOpacity: 1 } }).addTo(map);
+  map.attributionControl.addAttribution("Outlines: Natural Earth");
+});
+const OFFLINE = new URLSearchParams(location.search).has("offline");
+if (!OFFLINE) {
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+}
 const legend = L.control({ position: "bottomright" });
 legend.onAdd = () => {
   const d = L.DomUtil.create("div", "legend");
@@ -256,10 +269,11 @@ $("form").addEventListener("submit", async (e) => {
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
     current = data.routes;
-    $("results").innerHTML = current.map(renderCard).join("");
+    $("results").innerHTML = current.length ? current.map(renderCard).join("")
+      : `<div class="card">No options could be computed for this trip. See the notes below.</div>`;
     $("disclaimers").innerHTML = data.disclaimers.map((t) => `<div>• ${esc(t)}</div>`).join("");
     $("status").textContent = `${current.length} options · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-    drawRoutes(current, 0);
+    if (current.length) drawRoutes(current, 0); else layer.clearLayers();
   } catch (err) {
     $("status").className = "error"; $("status").textContent = `Could not compare: ${err.message}`;
   } finally {

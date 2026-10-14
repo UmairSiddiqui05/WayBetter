@@ -20,6 +20,8 @@ from app.trips.service import TripSearchService
 
 router = APIRouter(include_in_schema=False)
 TEMPLATE = Path(__file__).with_name("index.html")
+STATIC_DIR = Path(__file__).with_name("static")
+"""Vendored Leaflet (BSD-2) and a Natural Earth outline basemap, so the page works offline."""
 
 
 def _next_weekday_morning(now: datetime) -> datetime:

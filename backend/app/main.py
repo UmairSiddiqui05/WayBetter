@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import health
@@ -80,6 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router, prefix=API_V1_PREFIX)
     # Demo page (D-18), outside the versioned contract and excluded from OpenAPI.
     app.include_router(page.router)
+    app.mount("/static", StaticFiles(directory=page.STATIC_DIR), name="static")
 
     return app
 

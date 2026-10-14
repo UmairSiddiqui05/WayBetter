@@ -210,3 +210,14 @@ def test_demo_page_is_served_with_presets_but_stays_off_the_contract(
     assert "Princeton (Nassau St)" in page.text  # injected from the corridor data file
     assert "/*__PRESETS__*/" not in page.text
     assert "/" not in app.openapi()["paths"]
+
+
+def test_page_assets_are_local_so_the_demo_runs_offline(app: FastAPI) -> None:
+    client = TestClient(app)
+
+    for path in (
+        "/static/leaflet/leaflet.js",
+        "/static/leaflet/leaflet.css",
+        "/static/basemap-ny-nj-ct.geojson",
+    ):
+        assert client.get(path).status_code == 200, path

@@ -125,6 +125,10 @@ contract-lint: ## Lint the API contract the way CI does
 check-region: install ## Validate the region config and report missing data
 	$(VENV_BIN)/waybetter-ingest check-region
 
+.PHONY: warm-cache
+warm-cache: install ## Cache driving routes for every demo preset (run online once; demo then works offline)
+	$(VENV_BIN)/python -m app.trips.warm
+
 .PHONY: fetch-feeds
 fetch-feeds: install ## Download + validate enabled GTFS feeds, record provenance
 	$(VENV_BIN)/waybetter-ingest fetch

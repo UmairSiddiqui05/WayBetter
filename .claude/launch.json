@@ -4,8 +4,33 @@
     {
       "name": "waybetter-api",
       "runtimeExecutable": "backend/.venv/bin/uvicorn",
-      "runtimeArgs": ["app.main:app", "--app-dir", "backend", "--port", "8000", "--env-file", ".env"],
+      "runtimeArgs": [
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8000",
+        "--env-file",
+        ".env"
+      ],
       "port": 8000
+    },
+    {
+      "name": "waybetter-api-offline",
+      "runtimeExecutable": "sandbox-exec",
+      "runtimeArgs": [
+        "-p",
+        "(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip \"localhost:*\"))(allow network-outbound (remote unix-socket))",
+        "backend/.venv/bin/uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8001",
+        "--env-file",
+        ".env"
+      ],
+      "port": 8001
     }
   ]
 }

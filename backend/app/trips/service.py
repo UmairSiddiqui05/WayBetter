@@ -90,6 +90,11 @@ class TripSearchService:
     def timezone(self) -> ZoneInfo:
         return self._tz
 
+    @property
+    def option_count(self) -> int:
+        """Options a complete answer has: drive-all-the-way plus one per lot."""
+        return 1 + sum(len(group.lots) for group in self._pricing.parking_lots)
+
     # -- entry point ---------------------------------------------------------------
 
     def search(self, request: TripSearchRequest, now: datetime) -> TripSearchResponse:

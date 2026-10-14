@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). Steps 1–5 done: real comparison via `POST /trip/search` + Leaflet demo page at `/`.
+  access arrived, 2026-10-14). Steps 1–6 done: comparison API + Leaflet page, verified with outbound network blocked.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,24 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 6, offline):** `make warm-cache`
+  (`app/trips/warm.py`) runs every preset origin × destination and caches the 18 driving routes
+  in gitignored `data/cache/osrm/` (OSRM is free-flow, so one pass covers every departure time);
+  all 6 preset pairs return the full 5 options. Leaflet 1.9.4 vendored under
+  `backend/app/web/static/leaflet/` (byte-identical to unpkg — same SRI hashes — with its BSD-2
+  LICENSE), served via `/static`. **Map tiles are NOT cached:** OSM tiles return
+  `Cache-Control: no-cache` and the OSM tile policy forbids bulk pre-downloading, so instead a
+  Natural Earth 1:10m state-outline basemap (public domain, NY/NJ/CT/PA, 37 KB) sits in a pane
+  *below* the tiles — online it is hidden by OSM tiles, offline it shows through. `?offline=1`
+  skips the tile layer to show that view on purpose. **Verified offline:** ran uvicorn under
+  `sandbox-exec` with all outbound network denied except localhost (`waybetter-api-offline` in
+  `.claude/launch.json`); confirmed outbound blocked (curl to OSRM fails), all preset searches
+  return 5 options from cache, the page renders cards + routes + basemap, and the browser's
+  network log shows only localhost requests. An uncached origin offline degrades cleanly (no
+  crash; disclaimers explain; page says "No options could be computed"). **Not verified:** a
+  physical Wi-Fi-off run on the presenter's laptop (human, before the interview). 101 tests.
+  IDs: N-04, N-05, N-09.
 
 - **2026-10-14 — Claude (DEMO SPRINT step 5, demo page):** One static page,
   `backend/app/web/index.html`, served at `/` by `app/web/page.py` (outside `/api/v1`,
