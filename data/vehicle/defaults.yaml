@@ -1,0 +1,26 @@
+# Default vehicle assumptions for fuel cost (F-14). Users will override these later.
+kind: vehicle_defaults
+currency: USD
+effective_from: 2026-10-12
+effective_to: null
+gasoline:
+  usd_per_gallon: 4.347
+  status: estimated   # a regional weekly average applied to one trip
+  human_verified: false
+  source:
+    name: EIA Weekly Retail Gasoline Prices — Regular, Central Atlantic (PADD 1B), week of 2026-10-12
+    url: https://www.eia.gov/petroleum/gasdiesel/
+    retrieved: 2026-10-14
+    notes: EIA publishes no New Jersey series; PADD 1B (incl. NJ, NY) is the closest. Refresh weekly.
+fuel_economy:
+  mpg: 25.5
+  status: estimated
+  human_verified: false
+  source:
+    name: EPA Automotive Trends Report highlights (updated 2026-02-19), model year 2024
+    url: https://www.epa.gov/automotive-trends/highlights-automotive-trends-report
+    retrieved: 2026-10-14
+    notes: >
+      EPA: MY2024 new-vehicle real-world average 27.2 mpg including EVs/PHEVs, and "1.7 mpg
+      lower" without them. 27.2 - 1.7 = 25.5 mpg for a gasoline car (derived, not stated).
+cost_scope: Fuel only. Excludes depreciation, maintenance, and insurance.

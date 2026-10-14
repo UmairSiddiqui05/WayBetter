@@ -1,0 +1,26 @@
+# Port Authority of NY & NJ — Lincoln Tunnel, passenger car (2 axles).
+# Collected EASTBOUND only (entering New York); the drive home is not tolled here.
+kind: crossing_toll
+facility_id: lincoln_tunnel
+operator: Port Authority of New York and New Jersey
+direction_tolled: into_new_york
+currency: USD
+effective_from: 2026-01-04
+effective_to: null
+status: scheduled
+human_verified: false
+source:
+  name: PANYNJ toll schedule for Hudson River crossings (effective 2026-01-04)
+  url: https://www.panynj.gov/bridges-tunnels/en/tolls.html
+  retrieved: 2026-10-14
+  notes: >
+    The official page renders its table with JavaScript and could not be read by the agent.
+    Figures are from secondary sources citing the PANYNJ tariff (Wikipedia "Lincoln Tunnel").
+    HUMAN MUST CONFIRM on panynj.gov before the demo.
+rates:
+  ezpass_peak: 16.79
+  ezpass_off_peak: 14.79
+  toll_by_mail: 23.30
+peak_windows:
+  weekday: [["06:00", "10:00"], ["16:00", "20:00"]]
+  weekend: [["11:00", "21:00"]]

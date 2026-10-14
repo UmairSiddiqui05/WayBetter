@@ -1,0 +1,33 @@
+# NJ TRANSIT rail fares to/from New York Penn Station (F-12: fares are data, never code).
+# Adult one-way. NJ TRANSIT rail has no peak/off-peak price difference.
+kind: rail_fares
+agency: NJ TRANSIT Rail
+feed_id: njt_rail
+currency: USD
+effective_from: 2026-07-01
+effective_to: null
+status: scheduled
+human_verified: false   # CLAUDE.md: a human spot-checks every fare before it is "done"
+source:
+  name: "NJ TRANSIT, All Station Fares To/From Penn Station New York (Adjusted Fares, effective July 1, 2026)"
+  url: https://content.njtransit.com/sites/default/files/marketing/website/pdf/Fares/New%20York%20Penn%20Station.pdf
+  index_url: https://www.njtransit.com/adjustedfares
+  retrieved: 2026-10-14
+  notes: Values read from the Northeast Corridor column of the PDF chart (zone row -> ADULT OW).
+fares:
+  - from_station: nyc-metro:njt_rail:hamilton
+    to_station: nyc-metro:njt_rail:new-york-penn-station
+    fare_zone: 20
+    adult_one_way: 19.75
+  - from_station: nyc-metro:njt_rail:princeton-jct
+    to_station: nyc-metro:njt_rail:new-york-penn-station
+    fare_zone: 19
+    adult_one_way: 19.50
+  - from_station: nyc-metro:njt_rail:metropark
+    to_station: nyc-metro:njt_rail:new-york-penn-station
+    fare_zone: 10
+    adult_one_way: 13.05
+  - from_station: nyc-metro:njt_rail:secaucus-upper-level
+    to_station: nyc-metro:njt_rail:new-york-penn-station
+    fare_zone: 1
+    adult_one_way: 5.05

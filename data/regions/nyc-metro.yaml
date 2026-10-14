@@ -175,6 +175,7 @@ data_files:
   fares_dir: data/fares
   tolls_dir: data/tolls
   parking_dir: data/parking
+  vehicle_dir: data/vehicle
 
 graph_bundle:
   version: null

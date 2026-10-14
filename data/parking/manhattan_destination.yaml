@@ -1,0 +1,18 @@
+# Garage parking at the Manhattan destination, used by the drive-all-the-way baseline.
+kind: destination_parking
+currency: USD
+effective_from: 2026-10-14
+effective_to: null
+areas:
+  - area_id: midtown-manhattan
+    name: Midtown Manhattan garage, weekday daytime
+    status: unknown
+    human_verified: false
+    daily_usd: null   # unknown stays unknown (N-02)
+    source:
+      url: null
+      retrieved: 2026-10-14
+      notes: >
+        No current official or public-report figure found (latest public Colliers survey
+        median is from 2011). HUMAN: enter the posted weekday daily rate of a specific garage
+        near the demo destination, with its URL.

@@ -1,0 +1,76 @@
+# Park-and-ride lots for the demo corridor (NJ TRANSIT Northeast Corridor -> NY Penn).
+# Rates are tiers: the first tier whose max_hours covers the stay applies.
+# Driving target = the station coordinates from data/regions/nyc-metro-stations.csv.
+kind: parking_lots
+currency: USD
+effective_from: 2026-10-14
+effective_to: null
+lots:
+  - lot_id: hamilton-deck
+    station: nyc-metro:njt_rail:hamilton
+    name: Hamilton Station Parking Deck (Lot 1)
+    operator: Nexus Parking Systems (NJ TRANSIT-owned)
+    address: Klockner Rd & Sloan Ave, Hamilton, NJ
+    capacity: 2035
+    status: scheduled
+    human_verified: false
+    rate_tiers:
+      - {max_hours: 16, usd: 13.00}
+      - {max_hours: 20, usd: 15.00}
+      - {max_hours: 24, usd: 18.00}
+    source:
+      url: https://www.njtransit.com/station/hamilton-station
+      retrieved: 2026-10-14
+      notes: '"$13/UP TO 16 HOURS"; evenings up to 20h $15; nights up to 24h $18.'
+
+  - lot_id: princeton-jct-daily
+    station: nyc-metro:njt_rail:princeton-jct
+    name: Princeton Junction daily lots (Vaughn / Station Drive / Wallace Daily / Alexander)
+    operator: West Windsor Parking Authority
+    address: Wallace Rd between Alexander Rd and Rt 571, Princeton Junction, NJ
+    capacity: null
+    status: scheduled
+    human_verified: false
+    rate_tiers:
+      - {max_hours: 24, usd: 12.00}
+    source:
+      url: https://westwindsorpa.com/daily-parking/
+      secondary_url: https://www.njtransit.com/station/princeton-junction-station
+      retrieved: 2026-10-14
+      notes: >
+        "$12 daily rate for up to 24 hours". Excludes payment fees ($0.35 pay station,
+        $1.75 ParkMobile). Wallace Permit lot daily spaces are $17 Tue-Thu (very limited).
+
+  - lot_id: metropark-decks
+    station: nyc-metro:njt_rail:metropark
+    name: Metropark East & West Decks
+    operator: Nexus Parking Systems (NJ TRANSIT-owned)
+    address: 100 Middlesex Tpk (GSP exit 131A), Iselin, NJ
+    capacity: 3556
+    status: scheduled
+    human_verified: false
+    rate_tiers:
+      - {max_hours: 16, usd: 10.00}
+      - {max_hours: 20, usd: 12.00}
+      - {max_hours: 24, usd: 15.00}
+    source:
+      url: https://www.njtransit.com/station/metropark-station
+      retrieved: 2026-10-14
+      notes: '"$10/ UP TO 16 HOURS"; evenings up to 20h $12; nights up to 24h $15.'
+
+  - lot_id: secaucus-junction-parkfast
+    station: nyc-metro:njt_rail:secaucus-upper-level
+    name: Secaucus Junction (Edison ParkFast, 650 & 675 New County Rd)
+    operator: LAZ at Edison ParkFast (Edison Properties)
+    address: 650 New County Road, Secaucus, NJ
+    capacity: 1482
+    status: unknown
+    human_verified: false
+    rate_tiers: []   # unknown stays unknown (N-02) — never fabricate a plausible price
+    source:
+      url: https://www.njtransit.com/station/secaucus-junction-station
+      operator_url: https://go.lazparking.com/buynow?l=197687
+      retrieved: 2026-10-14
+      notes: >
+        NJ TRANSIT lists no daily rate ("Check website for current pricing"); the operator's
+        booking page refused automated access (HTTP 403). HUMAN: enter the weekday daily rate.

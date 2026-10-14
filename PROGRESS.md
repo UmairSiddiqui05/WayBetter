@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). Steps 1–2 done; NJT rail feed ingested.
+  access arrived, 2026-10-14). Steps 1–3 done (step 3: two prices `unknown`, awaiting human).
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -153,6 +153,25 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT step 3, price data):** Effective-dated YAML price files,
+  each with source URL + retrieval date + `status` + `human_verified: false` (F-12, F-13, F-14,
+  N-02, N-09): `data/fares/njt_rail.yaml` (official NJT NY Penn fare chart PDF, effective
+  2026-07-01: Hamilton $19.75, Princeton Jct $19.50, Metropark $13.05, Secaucus $5.05),
+  `data/fares/mta_subway.yaml` ($3.00, mta.info), `data/tolls/mta_congestion_relief_zone.yaml`
+  ($9 peak / $2.25 overnight, up-to-$3 peak crossing credit incl. Lincoln Tunnel, mta.info),
+  `data/tolls/panynj_lincoln_tunnel.yaml` ($16.79 / $14.79 / $23.30 — **secondary source**:
+  panynj.gov renders via JS and could not be read), `data/parking/njt_nec_demo_lots.yaml`
+  (Hamilton $13/16h, Metropark $10/16h from NJT station pages; Princeton Jct $12/24h from WWPA),
+  `data/parking/manhattan_destination.yaml`, `data/vehicle/defaults.yaml` (EIA PADD 1B regular
+  $4.347 wk 2026-10-12; 25.5 mpg derived from EPA Trends MY2024 27.2 incl. EVs minus 1.7).
+  **Two values are `unknown` with null amounts, not guessed:** Secaucus daily parking (operator
+  LAZ page returns 403; NJT lists none) and Midtown garage parking (no current public source).
+  New `app/pricing/` (strict Pydantic schemas + kind-dispatched loader); `DataFiles.vehicle_dir`.
+  Validation enforces: unknown ⇔ null amount, scheduled/estimated ⇒ source URL, files in effect
+  on the demo day, every fare/lot references a real canonical station. 79 tests green.
+  **Human spot-check required (CLAUDE.md) before any of this is "done":** all fares, the Lincoln
+  Tunnel toll on panynj.gov, the lot rates, and the two unknowns.
 
 - **2026-10-14 — Claude (DEMO SPRINT, NJT feed ingested + corridor):** Human switched the demo
   corridor to **NJ Transit Northeast Corridor → New York Penn Station** and entered their portal

@@ -1,0 +1,15 @@
+# MTA New York City Transit base fare (subway and local bus), pay-per-ride via OMNY.
+kind: flat_fare
+agency: MTA New York City Transit
+feed_id: mta_subway
+currency: USD
+effective_from: 2026-01-04
+effective_to: null
+status: scheduled
+human_verified: false
+source:
+  name: MTA Fares; 2025 fare and toll changes (board approval 2025-09-30, effective 2026-01-04)
+  url: https://www.mta.info/fares
+  secondary_url: https://www.mta.info/fares-tolls/2025-changes
+  retrieved: 2026-10-14
+adult_base_fare: 3.00

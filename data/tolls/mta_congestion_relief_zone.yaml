@@ -1,0 +1,26 @@
+# MTA Congestion Relief Zone toll — passenger vehicles. Zone: Manhattan local streets at or
+# south of 60 St (excluding FDR Drive, West Side Highway/Route 9A, Hugh L. Carey Tunnel links).
+kind: zone_toll
+facility_id: congestion_relief_zone
+operator: MTA Bridges and Tunnels
+currency: USD
+effective_from: 2025-01-05
+effective_to: 2027-12-31   # MTA: peak rises to $12 in 2028 (add a new effective-dated file then)
+status: scheduled
+human_verified: false
+source:
+  name: MTA, About the Congestion Relief Zone toll; Congestion Relief Zone FAQ
+  url: https://www.mta.info/fares-tolls/tolls/congestion-relief-zone/about
+  secondary_url: https://www.mta.info/fares-tolls/tolls/congestion-relief-zone/faq
+  retrieved: 2026-10-14
+rates:
+  ezpass_peak: 9.00
+  ezpass_overnight: 2.25
+charged_once_per_day: true
+peak_windows:
+  weekday: [["05:00", "21:00"]]
+  weekend: [["09:00", "21:00"]]
+crossing_credit:
+  # E-ZPass, peak period only; "up to" this amount for passenger vehicles.
+  max_credit_peak: 3.00
+  qualifying_facilities: [lincoln_tunnel, holland_tunnel, queens_midtown_tunnel, hugh_l_carey_tunnel]

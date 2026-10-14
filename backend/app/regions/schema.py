@@ -157,6 +157,7 @@ class DataFiles(StrictModel):
     fares_dir: str
     tolls_dir: str
     parking_dir: str
+    vehicle_dir: str = "data/vehicle"
 
 
 class GraphBundle(StrictModel):
