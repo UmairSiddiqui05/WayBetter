@@ -17,6 +17,7 @@ subway:
 commute:
   # Daily round-trip view: morning leg as searched, plus the evening trip home.
   default_return_time: "17:30"   # leave the destination at 5:30 PM unless the request says otherwise
+  default_departure_time: "07:00"  # assumed morning departure when a plain-words request names no time
   working_days_per_year: 250
   status: estimated              # a calendar count applied to one commuter (no leave, no remote days)
   source:

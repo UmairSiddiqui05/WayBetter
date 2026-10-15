@@ -10,7 +10,7 @@
 openapi: 3.1.0
 info:
   title: WayBetter API
-  version: 0.2.0
+  version: 0.3.0
   description: >
     Park-and-ride decision engine. All routing, scoring, labeling, and explanation
     logic is server-side; clients render these payloads without recomputation.
@@ -80,14 +80,31 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [draft, missing_fields]
+                required: [draft, missing_fields, interpretation, parser]
                 properties:
-                  draft: { $ref: "#/components/schemas/TripSearchRequest" }
+                  draft: { $ref: "#/components/schemas/TripSearchDraft" }
                   missing_fields:
                     type: array
                     items: { type: string }
+                    description: Draft fields the client must collect (origin, destination, target_time, return_time)
                   clarifying_question:
                     type: [string, "null"]
+                  interpretation:
+                    type: array
+                    description: >
+                      v0.3.0, additive. "Here's what I understood": one row per draft value with
+                      where it came from — ai_generated (read from the user's words), estimated
+                      (approximate place, or an app default when is_default is true), unknown
+                      (not found / not supported).
+                    items: { $ref: "#/components/schemas/InterpretationItem" }
+                  parser:
+                    type: string
+                    description: v0.3.0. Which parser read the text — "rules", or "ollama:<model>"
+                  parser_note:
+                    type: [string, "null"]
+                    description: v0.3.0. Why the fallback parser was used, when it was
+        "401": { description: Missing or invalid session token }
+        "422": { description: Empty text or longer than 1000 characters }
 
   /trip/{request_id}:
     get:
@@ -258,6 +275,37 @@ components:
             driving_penalty: { type: string, enum: [low, medium, high] }
         vehicle_profile: { $ref: "#/components/schemas/VehicleProfile" }
         # NOTE: no user_id field. Identity is server-side only until auth exists (N-06).
+
+    TripSearchDraft:
+      type: object
+      description: >
+        v0.3.0. TripSearchRequest with origin/destination nullable until resolved (a place
+        that could not be resolved is listed in missing_fields instead of guessed). Same
+        field names, so a complete draft posts to /trip/search unchanged.
+      required: [origin, destination, time_mode]
+      properties:
+        origin:
+          oneOf: [{ $ref: "#/components/schemas/LatLng" }, { type: "null" }]
+        destination:
+          oneOf: [{ $ref: "#/components/schemas/LatLng" }, { type: "null" }]
+        time_mode: { type: string, enum: [leave_now, leave_at, arrive_by] }
+        target_time: { type: [string, "null"], format: date-time }
+        return_time: { type: [string, "null"], pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        preferences:
+          type: object
+          properties:
+            sort_mode: { type: string, enum: [best_overall, fastest, cheapest] }
+        vehicle_profile: { $ref: "#/components/schemas/VehicleProfile" }
+
+    InterpretationItem:
+      type: object
+      required: [field, value_label, provenance, is_default]
+      properties:
+        field: { type: string, description: Draft field path, e.g. origin or preferences.sort_mode }
+        value_label: { type: string }
+        provenance: { $ref: "#/components/schemas/Provenance" }
+        is_default: { type: boolean, description: True when the user did not say it (app default) }
+        note: { type: [string, "null"], description: Where the value came from, incl. OSM attribution for geocoded places }
 
     CostBreakdown:
       type: object

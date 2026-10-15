@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NamedTuple, Protocol
+from typing import TYPE_CHECKING, NamedTuple, Protocol
+
+if TYPE_CHECKING:
+    from app.parsing.models import ParsedTrip
 
 
 class LatLon(NamedTuple):
@@ -65,3 +68,12 @@ class TransitProvider(Protocol):
     def trip_polyline(self, trip: TransitTrip) -> str | None:
         """Encoded polyline of the ridden segment, or None when the feed has no shape."""
         ...
+
+
+class LLMProvider(Protocol):
+    """Reads a trip request in plain words into ParsedTrip — words only, never coordinates,
+    prices, schedules or routes (D-11). Raises ProviderError on any failure."""
+
+    name: str
+
+    def parse_trip(self, text: str) -> ParsedTrip: ...

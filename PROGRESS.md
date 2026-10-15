@@ -158,6 +158,26 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT extension, branch `demo/nl-parse` — human-approved items 1, 12, 13, 14, 23):**
+  Plain-words trip requests. **Status: steps 1–2 of 5 done** (updated as steps land).
+  (1) Startup preload: the trip service (GTFS load) plus one preset warm-up search run on a daemon
+  thread at startup, so `/healthz` answers at once (18 ms measured) and the first search is fast
+  (9 ms vs 3.3 s cold, port 8010); skipped when `ENVIRONMENT=test` or the GTFS zip is missing.
+  (2) **API v0.3.0** (`docs/api-spec.yaml` + `app/__init__.py`): `POST /trip/ai-parse` implemented
+  (session required, text 1–1000 chars). Additive response fields `interpretation` (field,
+  value_label, provenance, is_default, note), `parser`, `parser_note`. **Contract deviation, logged:**
+  the spec's `draft` was `$ref TripSearchRequest`, whose origin/destination are required, so an
+  unresolved place could not be represented without guessing; added `TripSearchDraft` (same field
+  names, places nullable; unresolved ones go to `missing_fields`). `LLMProvider` protocol (N-04) in
+  `providers/base.py`; deterministic `RulesParser` adapter; one `TripParseService` resolves places,
+  dates and defaults for whichever parser ran. Arrive-by goes to `missing_fields` (search doesn't
+  support it). Corridor data gained `commute.default_departure_time` (07:00, marked default).
+  Also: `tests/conftest.py` sets `ENVIRONMENT=test` at import — locally, `.env` was leaking into the
+  settings singleton during collection and `test_healthz_is_dependency_free` failed on main too.
+  Files: `backend/app/parsing/*`, `backend/app/api/v1/trip.py`, `backend/app/trips/{factory,corridor}.py`,
+  `backend/app/main.py`, `backend/app/providers/base.py`, `data/regions/nyc-metro-demo-corridor.yaml`,
+  `docs/api-spec.yaml`, tests `test_preload.py`, `test_ai_parse.py`. Requirements: F-01, F-08, N-02, N-04, N-07.
+
 - **2026-10-14 — Claude (DEMO SPRINT, page round 4 — human feedback):** A Street / Simple switch on
   the map (top right) replaces needing a second tab for the plain basemap: Street (OpenStreetMap
   tiles) is always the default; Simple removes the tiles so only the bundled Natural Earth outlines

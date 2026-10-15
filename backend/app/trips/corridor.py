@@ -40,6 +40,8 @@ class CommuteAssumptions(Sourced):
     commute (for the monthly and annual figures)."""
 
     default_return_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    default_departure_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    """Morning departure assumed when a plain-words request (/trip/ai-parse) names no time."""
     working_days_per_year: int = Field(gt=0, le=366)
 
 
