@@ -55,9 +55,16 @@ def test_data_sources_are_injected_with_source_date_and_status(page: str) -> Non
 
 def test_template_has_no_money_literals_and_no_hard_coded_sorts() -> None:
     assert not re.search(r"\$\d", PAGE), "a dollar amount is written into the page (F-12)"
-    # Sort tabs render from response.sort_options; ranking stays server-side (N-01).
+    # Sort tabs render from response.sort_options; ranking stays server-side (N-01). The only place
+    # sort ids may appear is LOOK, the icon/colour per server id (presentation), and an id the page
+    # doesn't know falls back to a neutral look, so a new server sort needs no page change.
+    look = re.search(r"const LOOK = \{.*?\};\n", PAGE, re.S)
+    assert look, "LOOK presentation map not found"
+    rest = PAGE.replace(look.group(0), "")
     for sort_mode in ("best_overall", "cheapest", "fastest"):
-        assert sort_mode not in PAGE
+        assert sort_mode not in rest
+    assert 'LOOK[id] || { icon: "circle-check", tone: "plain" }' in PAGE
+    assert not re.search(r"(current|routes|data\.routes)\.sort\(", PAGE), "the page must not rank"
 
 
 def test_scripts_fonts_and_icons_load_locally() -> None:
@@ -147,5 +154,31 @@ def test_hidden_options_compare_view_and_map_links_render_from_the_response() ->
 def test_panel_and_map_share_a_draggable_keyboard_accessible_boundary() -> None:
     assert 'id="splitter" role="separator"' in PAGE and 'aria-orientation="vertical"' in PAGE
     assert 'tabindex="0"' in PAGE  # arrow keys resize too, not only the mouse
-    assert "var(--panel-w, 440px)" in PAGE  # the default width when nothing was dragged
+    assert "var(--panel-w, 468px)" in PAGE  # the default width when nothing was dragged
     assert ".splitter { display: none; }" in PAGE  # the phone layout stacks instead
+
+
+# -- D-22: Wayfinding redesign (renderer only, N-01) ----------------------------------------------
+
+
+def test_cards_are_list_items_with_a_real_button_not_role_button_rows() -> None:
+    # axe-core (WCAG 2.1 AA) flagged <li role="button"> inside the <ol>; each card is now a plain
+    # list item whose title is a <button> (aria-expanded); "Full details" is a separate button.
+    assert 'role="button"' not in PAGE
+    assert 'class="c-name" data-sel=' in PAGE and 'aria-expanded="${on}"' in PAGE
+    assert 'class="c-open" data-open=' in PAGE
+
+
+def test_map_markers_have_accessible_names() -> None:
+    assert PAGE.count("title: ") >= 4 and "alt: transit.end_location.label" in PAGE
+
+
+def test_estimates_are_marked_by_a_glyph_with_the_word_kept_for_screen_readers() -> None:
+    assert '.st-estimated::before { content: "≈" / "";' in PAGE  # empty alt: the sr text says it
+    assert '<span class="sr"> (${esc(provOf(p).word)})</span>' in PAGE
+
+
+def test_detail_shows_the_parking_facts_the_api_sends() -> None:
+    # F-10: lot name, price, capacity, availability confidence, source and date checked.
+    for field in ("lot.capacity", "p.confidence", "lot.source_url", "lot.last_verified_at"):
+        assert field in PAGE, field
