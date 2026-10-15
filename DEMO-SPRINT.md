@@ -1,9 +1,10 @@
 # DEMO SPRINT — Deloitte GPS portfolio demo (2026-10-14 → 2026-10-15)
 
-**Status: ACTIVE.** While this file says ACTIVE, it overrides PLAN.md, DECISIONS.md
-D-05/D-06/D-16, and the agent-task briefs wherever they conflict (see D-18). When the sprint
-ends, set Status to CLOSED and resume the normal plan; nothing here deletes the long-term
-architecture.
+**Status: CLOSED (2026-10-15, confirmed by the human).** PLAN.md is back on top of the
+precedence list; this file no longer overrides anything and is kept as history (D-18, D-20). The
+demo build it produced (OSRM + direct-GTFS adapters, the static Leaflet page, local uvicorn) keeps
+running until the Mapbox/OTP/Next.js work replaces it; post-sprint work follows the normal plan
+(first batch: D-21).
 
 > **Scope extension (D-20, approved 2026-10-14):** the "LLM layer" row below is partly lifted
 > for the demo: plain-words trip entry (`POST /trip/ai-parse`, local model per D-19, confirm

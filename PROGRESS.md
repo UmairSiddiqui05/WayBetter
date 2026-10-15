@@ -14,9 +14,13 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## In progress
 
-- **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
+- **D-21 post-sprint batch** (Claude, 2026-10-15) — items 17 (sorts + structured badges), 18
+  (emissions + cleanest), 19 (mpg / fuel price settings), 21 (avoid tolls, max walk filters), 35
+  (map-app handoff links), 11 (Compare view). API v0.8.0. Emission factors await the human spot-check.
+
+- **DEMO SPRINT (D-18) — CLOSED 2026-10-15** (human-confirmed). See [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Follow-up: daily round-trip view (API v0.2.0) added 2026-10-14. Extension D-20 (type-your-trip card with confirm-before-search, API v0.7.0; Handy voice) done 2026-10-14; tags `demo-safe-1014-ui`, `demo-safe-1015`. Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
+  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Follow-up: daily round-trip view (API v0.2.0) added 2026-10-14. Extension D-20 (type-your-trip card with confirm-before-search, API v0.7.0; Handy voice) done 2026-10-14; tags `demo-safe-1014-ui`, `demo-safe-1015`. Demo guide: [DEMO.md](DEMO.md). Remaining human item: price spot-check.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and

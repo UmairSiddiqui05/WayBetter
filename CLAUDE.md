@@ -2,12 +2,11 @@
 
 You are building **WayBetter**, the park-and-ride trip planner. Read this file fully before any work.
 
-## ⚠️ ACTIVE OVERRIDE — read [DEMO-SPRINT.md](DEMO-SPRINT.md) first
+## Demo sprint — CLOSED (2026-10-15)
 
-A time-boxed demo sprint is active (decision D-18). While DEMO-SPRINT.md says **ACTIVE**, it sits
-at the **top** of the precedence list below and its scope overrides are pre-approved by the
-human — do not stop to ask about them as "material deviations." Everything DEMO-SPRINT.md lists
-under "Rules that STILL apply" remains binding.
+[DEMO-SPRINT.md](DEMO-SPRINT.md) (D-18, D-20) is closed and no longer overrides anything; it is
+history. The demo build it produced (OSRM, direct-GTFS, static Leaflet page) is still what runs
+until the planned Mapbox/OTP/Next.js work replaces it. The normal precedence below applies.
 
 ## Document precedence (conflicts resolve top-down)
 
