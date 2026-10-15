@@ -73,6 +73,12 @@
     background: #fff; border-left: 3px solid var(--signal); font-weight: 600; }
   .u-q.need { border-left-color: var(--bad); }
   .u-parser { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .u-list li.has-change { grid-template-columns: 62px minmax(0, 1fr) auto; }
+  .u-list .linkish { font-size: 12px; align-self: start; padding-top: 2px; }
+  .u-go { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+  .u-go .primary { display: inline-flex; align-items: center; gap: 6px; }
+  .u-go .primary:disabled { opacity: .5; cursor: not-allowed; }
+  .choices .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--soft); }
   .place-note { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin-top: 2px; }
   .place-note:empty { display: none; }
   .place-note .u-q { margin-top: 4px; padding: 6px 8px; font-size: 12px; }
@@ -282,10 +288,10 @@
     <section class="view" id="view-plan">
       <form class="search" id="form">
         <div id="ask">
-          <label class="field" for="ask-text"><span>Or say it in plain words</span></label>
+          <label class="field" for="ask-text"><span>Type your trip</span></label>
           <div class="ask-box">
             <textarea id="ask-text" rows="2" maxlength="1000"
-              placeholder="Where from, where to, and what matters most: cost, speed, or when you head home…"></textarea>
+              placeholder="e.g. From Princeton to Times Square, leaving at 7:30, home at 6"></textarea>
             <button class="primary" id="ask-go" type="button"></button>
           </div>
           <div id="ask-out" aria-live="polite"></div>
@@ -947,7 +953,7 @@ $("form").addEventListener("click", (e) => {
 
 // ---- Plain words (POST /trip/ai-parse) --------------------------------------------------------
 // The server reads the words, resolves the places and fills a draft request; the page shows its
-// interpretation as sent and, when nothing is missing, copies the draft into the form above.
+// interpretation as sent. Nothing is searched until the user presses "Show options" (or Compare).
 $("ask-go").innerHTML = `${ic("sparkles", "sm")}Read it`;
 const ASK_HINT = { ai_generated: "read from your words", estimated: "approximate, or the app's default",
   unknown: "not found or not supported" };
@@ -958,20 +964,31 @@ const ASK_FIELD = { origin: "From", destination: "To", target_time: "When", retu
 // ("Default: …", "Read from your words") are in the row's tooltip.
 const ASK_PLACE = new Set(["origin", "destination"]);
 const parserText = (p) => p.startsWith("ollama:") ? `Read by a local AI model (${esc(p.slice(7))})` : "Read by the rules parser";
+// The current reading: the server's response, the choices picked, and the fields the user took
+// over (picked or opened with Change). The form is filled from the draft at most once per reading.
+let askData = null, askPick = {}, askTouched = new Set(), askApplied = false;
+const askReady = () => askData.missing_fields.every((f) => askTouched.has(f));
 function understoodHtml(a) {
-  const ready = !a.missing_fields.length;
+  const ready = askReady();
+  const choices = a.choices || [];
   return `<div class="understood">
     <div class="u-head">${ic("sparkles", "sm")} Here's what I understood</div>
-    <ul class="u-list">${a.interpretation.map((it) => `<li>
+    <ul class="u-list">${a.interpretation.map((it) => `<li class="has-change">
       <span class="u-k">${esc(ASK_FIELD[it.field] || humanize(it.field))}</span>
       <div title="${esc(ASK_PLACE.has(it.field) ? "" : it.note)}"><span class="u-v">${askVal(esc(it.value_label), it.provenance)}</span> ${word(it.provenance)}
         ${it.is_default ? `<span class="dflt">default</span>` : ""}
-        ${it.note && ASK_PLACE.has(it.field) ? `<div class="u-note">${esc(it.note)}</div>` : ""}</div></li>`).join("")}</ul>
-    ${a.clarifying_question ? `<div class="u-q ${ready ? "" : "need"}">${ic("circle-help")}<span>${esc(a.clarifying_question)}</span></div>` : ""}
-    ${ready ? "" : `<p class="u-parser">${ic("triangle-alert", "sm")} Needs: ${esc(a.missing_fields.map((f) => ASK_FIELD[f] || humanize(f)).join(", "))}. Answer in the box above, or pick in the form below.</p>`}
-    <p class="u-parser">${parserText(a.parser)}${a.parser_note ? ` · ${esc(a.parser_note)}` : ""}</p>
+        ${askPick[it.field] ? `<div class="u-note">You picked: ${esc(askPick[it.field])}</div>` : ""}
+        ${it.note && ASK_PLACE.has(it.field) ? `<div class="u-note">${esc(it.note)}</div>` : ""}</div>
+      <button type="button" class="linkish" data-ask-change="${esc(it.field)}" aria-label="Change ${esc(ASK_FIELD[it.field] || humanize(it.field))}">Change</button></li>`).join("")}</ul>
+    ${a.clarifying_question ? `<div class="u-q ${a.missing_fields.length ? "need" : ""}">${ic("circle-help")}<span>${esc(a.clarifying_question)}</span></div>` : ""}
+    ${choices.length ? `<div class="choices">${choices.map((c, i) =>
+      `<button type="button" class="chip" data-ask-choice="${i}" aria-pressed="${askPick[c.field] === c.text}">${ic("map-pin", "sm")}${esc(c.text)}</button>`).join("")}</div>` : ""}
+    ${a.missing_fields.length ? `<p class="u-parser">${ic("triangle-alert", "sm")} Needs: ${esc(a.missing_fields.map((f) => ASK_FIELD[f] || humanize(f)).join(", "))}. ${ready ? "Check the form, then show options." : "Pick a choice, use Change, or type it again above."}</p>` : ""}
+    <div class="u-go"><button class="primary" type="button" id="ask-show" ${ready ? "" : "disabled"}>${ic("circle-check", "sm")}Show options</button>
+      <span class="u-parser">${parserText(a.parser)}${a.parser_note ? ` · ${esc(a.parser_note)}` : ""}</span></div>
   </div>`;
 }
+const renderAsk = () => { $("ask-out").innerHTML = askData ? understoodHtml(askData) : ""; };
 // Put a draft place into a From/To list: the preset with the same coordinates, else the place as sent.
 function draftPlaceId(which, p) {
   const list = which === "origin" ? fromList : toList;
@@ -983,23 +1000,54 @@ function draftPlaceId(which, p) {
   PLACES.push(entry); list.unshift(entry);
   return id;
 }
-function applyDraft(d) {
-  const o = draftPlaceId("origin", d.origin), t = draftPlaceId("destination", d.destination);
-  fillList("origin"); fillList("destination");
-  setPlace("origin", place(o)); setPlace("destination", place(t));
+// Copy the draft into the form without searching. A place the server couldn't find leaves its
+// field empty (or holds the choice the user picked, which the server resolves on search).
+function fillFromDraft() {
+  if (askApplied) return;
+  askApplied = true;
+  const d = askData.draft;
+  for (const which of ["origin", "destination"]) {
+    if (askPick[which]) { $(which).value = askPick[which]; chosen[which] = null; $(`${which}-note`).innerHTML = ""; }
+    else if (d[which]) { const id = draftPlaceId(which, d[which]); fillList(which); setPlace(which, place(id)); }
+    else setPlace(which, null, `<span class="st-unknown">Not found in your words. Pick a place or type an address.</span>`);
+  }
   if (d.target_time) $("when").value = d.target_time.slice(0, 16);  // local time as sent, minus seconds/offset
   // For this page view only (not saved): the draft's home time, else the corridor default it reported.
   settings = { home: d.return_time || DEFAULTS.home, toll: d.vehicle_profile.toll_payment === "cash" ? "cash" : "ezpass" };
   renderChips();
   sortMode = d.preferences.sort_mode || null;
-  setPeriod("trip"); search();
+  if (sortOptions.length) renderSorts();
 }
+// "Change" puts the reading into the form and focuses the field that holds that value.
+const ASK_TARGET = { origin: () => $("origin"), destination: () => $("destination"), target_time: () => $("when"),
+  "preferences.sort_mode": () => $("sorts").querySelector('[aria-selected="true"]') || $("sorts").querySelector("button"),
+  return_time: () => (showView("settings"), $("set-home")),
+  "vehicle_profile.toll_payment": () => (showView("settings"), document.querySelector('input[name="toll"]:checked') || document.querySelector('input[name="toll"]')) };
+$("ask-out").addEventListener("click", async (e) => {
+  const change = e.target.closest("[data-ask-change]"), choice = e.target.closest("[data-ask-choice]");
+  if (change) {
+    const f = change.dataset.askChange;
+    fillFromDraft(); askTouched.add(f); renderAsk();
+    const el = (ASK_TARGET[f] || (() => null))();
+    if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); }
+  } else if (choice) {
+    const c = askData.choices[+choice.dataset.askChoice];
+    askPick[c.field] = c.text; askTouched.add(c.field);
+    if (askApplied) { $(c.field).value = c.text; chosen[c.field] = null; $(`${c.field}-note`).innerHTML = ""; }
+    renderAsk();
+  } else if (e.target.closest("#ask-show")) {
+    fillFromDraft(); setPeriod("trip");
+    await search();
+    if (!$("results-controls").hidden) $("results-controls").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+});
 let askTicket = 0;
 async function ask() {
   const text = $("ask-text").value.trim();
   if (!text) { $("ask-text").focus(); return; }
   const ticket = ++askTicket;
   $("ask-go").disabled = true;
+  askData = null;
   $("ask-out").innerHTML = `<p class="u-parser">Reading your words…</p>`;
   try {
     const post = async () => fetch("/api/v1/trip/ai-parse", { method: "POST",
@@ -1009,8 +1057,8 @@ async function ask() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
     if (ticket !== askTicket) return;
-    $("ask-out").innerHTML = understoodHtml(data);
-    if (!data.missing_fields.length) applyDraft(data.draft);
+    askData = data; askPick = {}; askTouched = new Set(); askApplied = false;
+    renderAsk();  // shows the reading only; the user confirms with "Show options"
   } catch (err) {
     if (ticket !== askTicket) return;
     $("ask-out").innerHTML = `<p class="u-parser" style="color:var(--bad)">Could not read that: ${esc(err.message)}</p>`;

@@ -6,11 +6,13 @@
 # no client-supplied user identity (N-06), server-issued anonymous sessions (N-05).
 # v0.2.0 (2026-10-14): daily round-trip commute — TripSearchRequest.return_time and
 # RouteOption.round_trip (RoundTrip, Savings). Additive; v0.1 clients ignore them.
+# v0.7.0 (2026-10-14): /trip/ai-parse response gains `choices` (answers to the clarifying
+# question, each a place text for origin or destination). Additive.
 
 openapi: 3.1.0
 info:
   title: WayBetter API
-  version: 0.6.0
+  version: 0.7.0
   description: >
     Park-and-ride decision engine. All routing, scoring, labeling, and explanation
     logic is server-side; clients render these payloads without recomputation.
@@ -89,6 +91,17 @@ paths:
                     description: Draft fields the client must collect (origin, destination, target_time, return_time)
                   clarifying_question:
                     type: [string, "null"]
+                  choices:
+                    type: array
+                    description: >
+                      v0.7.0, additive. Answers to clarifying_question when it has fixed ones
+                      (a street found in several towns), each a place as text for one field.
+                    items:
+                      type: object
+                      required: [field, text]
+                      properties:
+                        field: { type: string, enum: [origin, destination] }
+                        text: { type: string }
                   interpretation:
                     type: array
                     description: >

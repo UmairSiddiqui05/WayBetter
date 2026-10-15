@@ -181,6 +181,22 @@ def test_model_values_without_backing_words_are_dropped() -> None:
     assert out.parser_note and "toll payment" in out.parser_note and "priority" in out.parser_note
 
 
+def test_place_names_are_not_evidence_for_a_priority() -> None:
+    """Seen live 2026-10-14: "from Nassau Street to Times Square" came back "least driving",
+    and the "time" inside "Times Square" let it through."""
+    content = json.dumps(
+        {
+            "origin_text": "Princeton",
+            "destination_text": "Times Square",
+            "priority": "least_driving",
+        }
+    )
+    out = _service(_provider(_reply(content))).parse("from Princeton to Times Square", NOW)
+
+    assert out.draft.preferences.sort_mode == "best_overall"
+    assert out.parser_note and "priority" in out.parser_note
+
+
 def test_exact_times_from_the_text_beat_the_models_times() -> None:
     """Seen live: "leaving 7:15 ... home by 6:30" came back as arrive-by 18:30, no leave time."""
     content = json.dumps(

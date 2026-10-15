@@ -67,10 +67,20 @@ class InterpretationItem(BaseModel):
     note: str | None = None
 
 
+class PlaceChoice(BaseModel):
+    """v0.7.0. One answer to the clarifying question: a place as text, for the From or To field."""
+
+    field: Literal["origin", "destination"]
+    text: str
+
+
 class AiParseResponse(BaseModel):
     draft: TripSearchDraft
     missing_fields: list[str]
     clarifying_question: str | None
+    choices: list[PlaceChoice] = []
+    """v0.7.0. Places that answer `clarifying_question` (e.g. a street found in several towns);
+    empty when the question has no fixed answers."""
     interpretation: list[InterpretationItem]
     parser: str
     """Which parser read the text: "rules", or "ollama:<model>" for the local model."""

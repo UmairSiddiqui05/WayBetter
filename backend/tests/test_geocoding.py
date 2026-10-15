@@ -470,6 +470,28 @@ def test_a_street_in_several_towns_offers_choices_and_picks_none(corridor: Corri
     assert lookup.clarifying_question and "Princeton" in lookup.clarifying_question
 
 
+def test_plain_words_parse_returns_the_question_with_its_choices(corridor: Corridor) -> None:
+    """v0.7.0: /trip/ai-parse sends the same choices as /places/resolve, tagged with the field."""
+    geocoder = FakeGeocoder(
+        {
+            "nassau street": [
+                _addr(
+                    "Nassau Street", "Nassau Street", None, "Princeton", 40.35, -74.65, "highway"
+                ),
+                _addr("Nassau Street", "Nassau Street", None, "New York", 40.71, -74.01, "highway"),
+            ]
+        }
+    )
+    parse = _service(corridor, geocoder).parse("from Nassau Street to Times Square", NOW)
+
+    assert "origin" in parse.missing_fields
+    assert parse.clarifying_question and "Princeton" in parse.clarifying_question
+    assert [(c.field, c.text) for c in parse.choices] == [
+        ("origin", "Nassau Street, Princeton"),
+        ("origin", "Nassau Street, New York"),
+    ]
+
+
 def test_a_name_in_only_one_town_is_used(corridor: Corridor) -> None:
     hit = _addr("Rockefeller Center", None, None, "New York", 40.7593, -73.98, "tourism")
     geocoder = FakeGeocoder({"rockefeller center": [hit]})

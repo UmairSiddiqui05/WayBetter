@@ -18,6 +18,7 @@ from app.parsing.models import (
     AiParseResponse,
     InterpretationItem,
     ParsedTrip,
+    PlaceChoice,
     PlaceLookupResponse,
     TripSearchDraft,
 )
@@ -49,9 +50,11 @@ def _leave_label(at: datetime, hhmm: str) -> str:
 
 
 _EVIDENCE = {
+    # Word starts only, so place names don't count: "Times Square" isn't "time",
+    # "Short Hills" isn't "short", "breakfast" isn't "fast".
     "priority": re.compile(
-        r"cheap|money|cost|price|budget|afford|spend|sav(?:e|ing)|expens|fast|quick|hurry"
-        r"|soon|rush|short|time|driv|wheel",
+        r"\b(?:cheap|money|cost|price|budget|afford|spend|sav(?:e|ing)|expens|fast|quick|hurry"
+        r"|soon|rush|short(?!\s+hills)|time\b|driv|wheel)",
         re.IGNORECASE,
     ),
     "toll_payment": re.compile(r"cash|e[\s-]?z[\s-]?pass|toll|transponder", re.IGNORECASE),
@@ -205,6 +208,7 @@ class TripParseService:
         items: list[InterpretationItem] = []
         missing: list[str] = []
         questions: list[str] = []
+        choices: list[PlaceChoice] = []
 
         points = {}
         for role, words in (
@@ -225,6 +229,8 @@ class TripParseService:
                 missing.append(role)
             if res.question:
                 questions.append(res.question)
+                if len(questions) == 1:  # choices answer the question shown (the first)
+                    choices = [PlaceChoice(field=role, text=t) for t in res.suggestions]  # type: ignore[arg-type]
 
         # When: leave-at time (words or corridor default), or arrive-by (not supported yet).
         target_time: datetime | None = None
@@ -336,6 +342,7 @@ class TripParseService:
             draft=draft,
             missing_fields=missing,
             clarifying_question=questions[0] if questions else None,
+            choices=choices,
             interpretation=items,
             parser=parser,
             parser_note=parser_note,

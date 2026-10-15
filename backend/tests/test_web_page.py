@@ -96,3 +96,12 @@ def test_plain_words_box_posts_to_ai_parse(page: str) -> None:
     shown = ("interpretation", "missing_fields", "clarifying_question", "parser_note", "is_default")
     for field in shown:
         assert field in page, field
+
+
+def test_plain_words_never_search_without_the_user_confirming(page: str) -> None:
+    # The reading is shown with a "Show options" button, a Change link per row and the question's
+    # choices; reading the words must not start a search by itself.
+    assert 'id="ask-show"' in page and "data-ask-change" in page and "data-ask-choice" in page
+    reading = page[page.index("async function ask()") : page.index('$("ask-go").addEventListener')]
+    assert "search(" not in reading
+    assert "fillFromDraft" not in reading
