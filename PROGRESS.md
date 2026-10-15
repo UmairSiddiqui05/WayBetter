@@ -84,21 +84,21 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Backlog / discovered
 
-- **Evening departures fail (found 2026-10-15, audit):** any `leave_at` later than the head-home
+- **[Resolved 2026-10-15, D-22]** **Evening departures fail (found 2026-10-15, audit):** any `leave_at` later than the head-home
   time (corridor default 17:30) returns 422 "The head-home time must be later the same day than
   the departure", even when the user never set a home time (6:00 PM fails; Saturday 7:00 AM and
   23:30 with home 23:59 work). Plan one way with `round_trip: null` and say why instead
   (`round_trip` is already nullable in the contract). `TripSearchService._return_at`.
-- **Page bugs (found 2026-10-15, audit):** Settings number inputs are right-aligned (the row
+- **[Resolved 2026-10-15, D-22]** **Page bugs (found 2026-10-15, audit):** Settings number inputs are right-aligned (the row
   figures' `.num` rule also matches `input.num`); the remembered panel width is overwritten in
   memory by the clamped value when the page loads in a narrow window (620 px saved, 320 px shown
   in a 1,425 px window); server notes with "->" wrap between "-" and ">" (`overflow-wrap:
   anywhere`); a failed search leaves the old results on screen; axe-core (WCAG 2.1 AA) reports the
   train-station marker without an accessible name and `li role="button"` inside `ol`.
-- **README is stale (found 2026-10-15):** the public repo's README says "Status: planning
+- **[Resolved 2026-10-15]** **README is stale (found 2026-10-15):** the public repo's README says "Status: planning
   complete, pre-build" and describes OTP/Mapbox/Gemini as the running stack. Describe the working
   demo, with screenshots and run steps. DEMO.md's header also says "after the interview".
-- **Route-card redesign proposal (audit 2026-10-15):** "Wayfinding" theme, compact cards with a
+- **[Done 2026-10-15, D-22]** **Route-card redesign proposal (audit 2026-10-15):** "Wayfinding" theme, compact cards with a
   line diagram, expand-in-place, Cards/Table switch, filter chips, detail savings banner, parking
   card (F-10). Prototyped outside the repo; see the 2026-10-15 audit work-log entry. Awaits the
   human's approval (would be D-22).
@@ -112,7 +112,7 @@ The single source of truth for **what is done, what is in progress, and what com
   the EPA page and the 2025 Hub xlsx (Table 10). Set `human_verified: true` after checking.
 - **best_parking sort** is in the contract enum but rejected by the server (422) until lot
   occupancy/confidence data exists; offering it now would rank on nothing.
-- **Agency name in code (N-03):** `TripSearchService._disclaimers()` says "NJ TRANSIT's published
+- **[Resolved 2026-10-15]** **Agency name in code (N-03):** `TripSearchService._disclaimers()` says "NJ TRANSIT's published
   schedule"; it should come from the feed's `agency_name` in region config. Pre-existing (demo
   sprint), found 2026-10-15.
 - **Daily CO₂:** `emissions_kg` covers the morning trip only; a `RoundTrip.daily_emissions_kg`
@@ -204,6 +204,37 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-15 — Claude (D-22, human-approved audit steps 1–5):** (1) Rollback tag
+  **`demo-safe-1015-audit`** on `0206176` (local, not pushed). (2) **Evening departures:** a
+  departure after the head-home time plans one way (`round_trip: null`), each option warns "No trip
+  home planned…", and a disclaimer names both times; ranking and badges unchanged (was a 422; no
+  contract change, `round_trip` was already nullable). (3) **Wayfinding redesign** ported from the
+  audit prototype into `index.html` as one stylesheet (no override layer): line-stripe header,
+  corridor pill, compact search card (From/To labels kept for screen readers), rank-by pills with
+  icons, Trip/Day/Month + Cards/Table, status row with a short key, cards (rank bullet, tinted
+  badges, equal-size time and price, trip as a line diagram with "P" and the platform wait,
+  savings/CO₂/home chips), the selected card expands in place (cost bar, all three periods, trip
+  home); its title is a real `<button aria-expanded>` covering the card and "Full details" is a
+  separate button; the detail hides the search card and opens on a savings banner (or the
+  driving baseline), four period tiles, the explanation, and the lot card (F-10: price, capacity,
+  availability confidence, source, date checked); steps joined by mode-coloured lines. Avoid
+  tolls is a one-tap chip (saves only that filter). Nine Lucide 1.48.0 icons added to the sprite.
+  Fixes: Settings inputs renamed `.setnum` (alignment), the remembered panel width is no longer
+  overwritten by a clamped one, notes wrap without splitting "->", markers have names, a failed
+  search dims the old results and says they're from the last comparison. (4) Disclaimer agency
+  from the region feed registry (N-03). (5) README rewritten for the working demo with
+  screenshots (`docs/screenshots/`). Tests: the sort-id guard now strips the `LOOK` presentation
+  map and also bans client-side `.sort(`; panel default 468 px; new tests for card markup, marker
+  names, the ≈ marker, parking facts, evening departures, agency from config (304 total). ruff,
+  mypy strict clean. **Verified** on port 8020: select / Full details / back (focus returns to
+  the card), avoid-tolls chip (3 shown, 2 hidden with reasons), Cleanest, Month, Table, a 6:00 PM
+  departure, an unplaceable From; axe-core 4.10 WCAG 2.1 AA: **0 violations** on list, detail and
+  table (was 2); 390 px has no sideways scroll; no console errors. DEMO.md talk track updated.
+  Files: `backend/app/web/index.html`, `backend/app/web/static/icons/sprite.svg`,
+  `backend/app/trips/service.py`, `backend/tests/{test_web_page,test_trip_search}.py`,
+  `README.md`, `docs/screenshots/`, `DEMO.md`, `DECISIONS.md`, `PROGRESS.md`.
+  Requirements: F-01, F-07, F-10, F-18, N-01, N-02, N-03.
 
 - **2026-10-15 — Claude (audit, human request; no code changed):** Full UI/UX and functionality
   audit of the demo page and API for the Deloitte GPS interview, published as a private artifact

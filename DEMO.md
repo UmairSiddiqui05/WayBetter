@@ -9,11 +9,18 @@ adds up to per month and per year compared with driving. You can also **type or 
 plain English**: a local AI model reads it, the page shows what it understood and where each
 value came from, and nothing is searched until you press **Show options**.
 
-> **Updated 2026-10-15 (after the interview; demo sprint closed, D-21, API v0.8.0):** seven
+> **Updated 2026-10-15 (demo sprint closed, D-21, API v0.8.0):** seven
 > ranking tabs (adds Most driving, Fewest transfers, Cleanest), badges only for a unique winner,
 > CO₂ per option from EPA factors, your own mpg and gas price in Settings, two filters (avoid
 > tolls, longest walk) that list what they hide and why, "Open in Google Maps / Apple Maps" on
 > every drive step, and a **Compare options** view in the menu. See step 9 and §3 E.
+>
+> **Redesign 2026-10-15 (D-22):** option cards with a rank bullet, coloured badges and the trip
+> drawn as a line diagram; click a card to expand it in place (cost bar, other periods, trip
+> home), click again or **Full details** for the step-by-step view, which now opens on a green
+> savings banner and the lot's facts. **≈** marks an estimate (it replaced the dotted
+> underline). Avoid tolls is a chip under the trip; **Cards | Table** replaces the menu's
+> Compare. A departure after the head-home time plans one way and says why (it used to error).
 
 ---
 
@@ -55,7 +62,7 @@ make fetch-feeds                                     # downloads MTA + NJ TRANSI
 make warm-cache                                      # caches the demo driving routes (morning + home)
 brew install ollama && brew services start ollama    # local AI model server
 ollama pull qwen3:8b                                 # the model (5.2 GB, one time)
-make check                                           # ruff + mypy + 255 tests
+make check                                           # ruff + mypy + 304 tests
 ```
 
 Handy (voice, optional): installed 2026-10-14 from the official GitHub release
@@ -92,18 +99,21 @@ hard-coded (an unconfirmed business falls back to the town it's in).
 1. *"Five options. Driving all the way is fastest at 82 minutes, but costs **$76**. Parking at
    Metropark and taking the train costs **$27.60**, about $48 less, for roughly half an hour
    more door to door."*
-2. Click the **Drive all the way** card. *"Here's why driving costs $76: the NJ Turnpike from
+2. Click the **Drive all the way** card; it expands with its cost bar (gas, garage, tolls,
+   congestion). *"Here's why driving costs $76: the NJ Turnpike from
    Exit 9 to the Lincoln Tunnel is $10.29, the tunnel is $16.79, the congestion toll is $9 minus
    the $3 tunnel credit, a Midtown garage is about $34, plus gas. The system read the actual
    route to see which toll roads you'd use, then priced each one from the official schedules."*
-3. Point at the colored labels. *"Every number is labeled **scheduled** (a published price or
-   timetable), **estimated** (an average or a derived figure), or **unknown**. When we don't
-   have a sourced number, the app says unknown instead of guessing. For a public-sector client,
+3. Point at the key above the cards. *"Every number carries its status. **≈** means estimated
+   (an average or a derived figure), a plain number comes from a published price or timetable,
+   and red **unknown** means we don't have a sourced number, so the app says so instead of
+   guessing. The detail's cost table spells it out in words. For a public-sector client,
    a confidently wrong price destroys trust faster than an honest gap."*
 4. Click **Princeton Jct.** *"The 7:38 is an express that reaches Penn at 8:36. The 7:20 local
    leaves earlier but arrives later, so the system picks the train that **arrives first**, not
    the one that leaves first."*
-5. **The daily commute.** Point at the two numbers on the Metropark card, then its table.
+5. **The daily commute.** Click **Metropark**, then **Full details**: the green banner leads with
+   the savings, and the day's cost table is below.
    *"A one-way number isn't fair, because you pay for parking for the whole day. So the system
    also plans the trip home: the 6:00 PM train from Penn, back to the car, home by 7:33. In the
    Day column, the train fare and gas count twice, but parking counts once. A day costs
@@ -138,12 +148,12 @@ hard-coded (an unconfirmed business falls back to the town it's in).
    Junction wins on CO₂: a 9-minute drive, then the train. The factors are EPA's, per gallon
    and per passenger-mile, in a data file with the source, and the number is labeled estimated."*
    Point at the badges: *"A badge goes only to an outright winner. All five options have zero
-   transfers, so nobody gets 'Fewest transfers'. A tie is not a win."* Open **Settings**, tick
-   **Avoid tolls**, Save. *"Driving all the way and Secaucus disappear, but not silently: under
+   transfers, so nobody gets 'Fewest transfers'. A tie is not a win."* Tap the **Avoid
+   tolls** chip under the trip. *"Driving all the way and Secaucus disappear, but not silently: under
    the list it says why, with the exact tolls, and Secaucus is hidden because its drive **home**
-   uses the Turnpike."* Open the menu → **Compare options**: every option in one table. In
-   any option's detail, the drive step has **Open in Google Maps / Apple Maps**. Untick Avoid
-   tolls afterwards.
+   uses the Turnpike."* Switch **Cards → Table**: every option in one table. In
+   any option's detail, the drive step has **Open in Google Maps / Apple Maps**. Tap the chip again
+   afterwards.
    Tip: drag the thin bar between the list and the map to give either more room (double-click
    it to reset); the page remembers the width.
 
@@ -313,6 +323,8 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 - **Not yet human-spot-checked:** the rail fares, lot rates and Turnpike rates were read from
   official documents, but CLAUDE.md requires a human check before they count as verified.
 - "Arrive by" planning isn't implemented in the demo; it uses "leave at".
+- A departure after the head-home time (default 5:30 PM) is planned one way only, and the page
+  says why; set a later head-home time to see daily, monthly and yearly figures.
 - **Monthly and annual figures assume you commute every working day** (250 a year, no
   vacation or remote days) and use daily garage and lot rates. Monthly garage contracts and lot
   permits are not modeled; a Midtown monthly garage contract would narrow driving's gap.
@@ -379,7 +391,7 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   place name it doesn't know goes to OpenStreetMap's address lookup), and if it's down a rules
   parser takes over. The production
   plan (D-10) swaps in a cloud model behind the same interface.
-- **"What did you test?"** 298 automated tests (cost math, toll detection in both directions,
+- **"What did you test?"** 304 automated tests (cost math, toll detection in both directions,
   once-a-day charges, monthly-pass math, every sort, filter and badge tie rule, CO₂, unknown
   handling, session tokens, API contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
   network access blocked.
