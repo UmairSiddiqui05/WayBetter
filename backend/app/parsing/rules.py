@@ -30,7 +30,7 @@ _LEAVE = re.compile(
     re.IGNORECASE,
 )
 _STOP = (
-    r"(?=\s*(?:[,.;!?]|\band\b|\b(?:at|by|around|before)\s+\d|\bleav|\bhead|\bhome\b|\barriv"
+    r"(?=\s*(?:[,;!?]|(?<!\b[A-Za-z])(?<!\bSt)(?<!\bAve)(?<!\bRd)(?<!\bDr)\.(?!\w)|\band\b|\b(?:at|by|around|before)\s+\d|\bleav|\bhead|\bhome\b|\barriv"
     r"|\bi\s+(?:want|need|have|would|'d)|\bcheap|\bfast|\bquick|\bwith\b|\busing\b"
     r"|\bwhat\b|\bhow\b|\btomorrow\b|\btoday\b|$))"
 )

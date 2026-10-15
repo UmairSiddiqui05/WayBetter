@@ -24,6 +24,12 @@ class Place(_Strict):
     in_congestion_relief_zone: bool | None = None
     """Human-checked fact; None = unknown (the toll is then reported unknown)."""
     parking_area: str | None = None
+    aliases: tuple[str, ...] = ()
+    """Other names people use for this place (normalized before matching)."""
+    town: str | None = None
+    """Set on origins a plain-words request may fall back to approximately, by town name."""
+    source: str | None = None
+    """Where the coordinates came from (with attribution) when not hand-picked."""
 
     @property
     def point(self) -> LatLon:

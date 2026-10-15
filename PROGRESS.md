@@ -78,6 +78,8 @@ The single source of truth for **what is done, what is in progress, and what com
 - [ ] App Store submission
 
 ## Backlog / discovered
+
+- **Ranking with unknown costs** (found 2026-10-14, `demo/nl-parse`): an option whose total excludes an unknown component (e.g. drive-in to Javits, parking unknown) is ranked and badged on its partial total. Consider ranking complete-cost options ahead for `cheapest`/`best_overall`, or withholding the Cheapest badge from incomplete options. Needs a human product call.
 - **Send total statuses from the server (N-02):** `CostBreakdown.total` and `RouteOption.total_minutes`
   carry no provenance, so the demo page rolls up the parts' statuses for display. Add
   `total_provenance` (and a minutes status) in the next API version so the client renders it
@@ -159,7 +161,7 @@ The single source of truth for **what is done, what is in progress, and what com
 ## Work log (append-only, newest first)
 
 - **2026-10-14 — Claude (DEMO SPRINT extension, branch `demo/nl-parse` — human-approved items 1, 12, 13, 14, 23):**
-  Plain-words trip requests. **Status: steps 1–2 of 5 done** (updated as steps land).
+  Plain-words trip requests. **Status: steps 1–3 of 5 done** (updated as steps land).
   (1) Startup preload: the trip service (GTFS load) plus one preset warm-up search run on a daemon
   thread at startup, so `/healthz` answers at once (18 ms measured) and the first search is fast
   (9 ms vs 3.3 s cold, port 8010); skipped when `ENVIRONMENT=test` or the GTFS zip is missing.
@@ -174,6 +176,18 @@ The single source of truth for **what is done, what is in progress, and what com
   support it). Corridor data gained `commute.default_departure_time` (07:00, marked default).
   Also: `tests/conftest.py` sets `ENVIRONMENT=test` at import — locally, `.env` was leaking into the
   settings singleton during collection and `test_healthz_is_dependency_free` failed on main too.
+  (3) Verified places: corridor `Place` gained `aliases`, `town`, `source`. Added origin **Raritan
+  (town center)** 40.5671, -74.6347 (one Nominatim lookup, borough relation 170844, ODbL) and
+  destination **Javits Center (429 11th Ave)** 40.7584, -74.0022 (OSM, ODbL). Javits
+  `in_congestion_relief_zone: true` — **human-confirmed 2026-10-14** against the MTA zone text
+  (11th Ave is a local street south of 60 St); `parking_area: null` — **human decision
+  2026-10-14**, no sourced rate, so drive-in parking shows unknown. Resolution: normalized name /
+  alias / town match, small typos via difflib (≥ 0.88), filler words ignored; "<business> in
+  <known town>" → that town, `estimated`, value labelled approximate, plus a clarifying question;
+  anything else → `missing_fields` + question. `make warm-cache` now covers 4 × 3 presets (66 routes).
+  **Surprise (backlog):** with Javits parking unknown, the drive option's total excludes parking,
+  so under `best_overall` "Drive all the way" can rank first (Princeton → Javits $42.01*, flagged
+  "Some costs are unknown"). `cheapest` still ranks Metropark first for every Javits pair.
   Files: `backend/app/parsing/*`, `backend/app/api/v1/trip.py`, `backend/app/trips/{factory,corridor}.py`,
   `backend/app/main.py`, `backend/app/providers/base.py`, `data/regions/nyc-metro-demo-corridor.yaml`,
   `docs/api-spec.yaml`, tests `test_preload.py`, `test_ai_parse.py`. Requirements: F-01, F-08, N-02, N-04, N-07.

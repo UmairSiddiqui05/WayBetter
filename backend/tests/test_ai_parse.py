@@ -252,3 +252,66 @@ def test_endpoint_rejects_unknown_request_fields(parse_client: TestClient) -> No
     )
 
     assert response.status_code == 422
+
+
+# -- verified places, aliases, approximate towns (item 14) ---------------------------
+
+
+def test_delucias_request_uses_raritan_approximately_and_javits_verified(
+    corridor: Corridor,
+) -> None:
+    out = _service(corridor).parse(DELUCIAS, NOW)
+    items = _items(out)
+
+    assert out.missing_fields == []
+    assert out.draft.preferences.sort_mode == "cheapest"
+    origin = items["origin"]
+    assert origin.provenance is Provenance.ESTIMATED  # type: ignore[attr-defined]
+    assert "Raritan" in origin.value_label  # type: ignore[attr-defined]
+    assert "approximate" in origin.value_label.lower()  # type: ignore[attr-defined]
+    raritan = next(p for p in corridor.origins if p.id == "raritan")
+    assert out.draft.origin is not None
+    assert (out.draft.origin.lat, out.draft.origin.lng) == (raritan.lat, raritan.lng)
+    assert out.clarifying_question and "DeLucia's Brick Oven Pizza" in out.clarifying_question
+    dest = items["destination"]
+    assert dest.provenance is Provenance.AI_GENERATED  # type: ignore[attr-defined]
+    assert dest.value_label.startswith("Javits Center")  # type: ignore[attr-defined]
+    assert "OpenStreetMap" in (dest.note or "")  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ("text", "origin_id", "destination_id"),
+    [
+        ("from raritan nj to javitz center", "raritan", "javits-center"),
+        ("from Princeton to Jacob K. Javits Convention Center.", "princeton", "javits-center"),
+        ("from Raritan, NJ to the Javits", "raritan", "javits-center"),
+        ("from PRINCETON to times square", "princeton", "times-square"),
+    ],
+)
+def test_aliases_and_small_typos_match_verified_places(
+    corridor: Corridor, text: str, origin_id: str, destination_id: str
+) -> None:
+    out = _service(corridor).parse(text, NOW)
+    by_id = {p.label: p.id for p in (*corridor.origins, *corridor.destinations)}
+
+    assert out.missing_fields == []
+    assert out.draft.origin is not None and out.draft.destination is not None
+    assert by_id[out.draft.origin.label or ""] == origin_id
+    assert by_id[out.draft.destination.label or ""] == destination_id
+
+
+def test_unknown_business_in_an_unknown_town_is_not_guessed(corridor: Corridor) -> None:
+    out = _service(corridor).parse("from Joe's Diner in Hoboken to Times Square", NOW)
+
+    assert out.missing_fields == ["origin"]
+    assert out.draft.origin is None
+
+
+def test_new_corridor_places_carry_sources_and_honest_unknowns(corridor: Corridor) -> None:
+    raritan = next(p for p in corridor.origins if p.id == "raritan")
+    javits = next(p for p in corridor.destinations if p.id == "javits-center")
+
+    assert raritan.source and "ODbL" in raritan.source
+    assert javits.source and "ODbL" in javits.source
+    assert javits.in_congestion_relief_zone is True  # human-confirmed 2026-10-14
+    assert javits.parking_area is None  # unknown: no sourced garage rate

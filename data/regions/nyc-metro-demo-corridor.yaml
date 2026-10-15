@@ -25,10 +25,23 @@ commute:
     url: https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/
     retrieved: 2026-10-14
     notes: 250 / 12 = 20.8 working days a month. Derived, not stated by OPM.
+# Places: `aliases` are other names people use (matched after lowercasing and dropping
+# punctuation). `town` marks an origin a plain-words request may fall back to, approximately,
+# when it names a business we don't know in that town (/trip/ai-parse). `source` records
+# where coordinates came from that a human did not pick by hand.
 origins:
-  - {id: princeton, label: "Princeton (Nassau St)", lat: 40.3500, lng: -74.6597}
-  - {id: lawrenceville, label: "Lawrenceville (Business Rte 206)", lat: 40.2968, lng: -74.7296}
-  - {id: plainsboro, label: "Plainsboro (Scudders Mill Rd)", lat: 40.3330, lng: -74.5946}
+  - {id: princeton, label: "Princeton (Nassau St)", lat: 40.3500, lng: -74.6597, town: Princeton}
+  - {id: lawrenceville, label: "Lawrenceville (Business Rte 206)", lat: 40.2968, lng: -74.7296, town: Lawrenceville}
+  - {id: plainsboro, label: "Plainsboro (Scudders Mill Rd)", lat: 40.3330, lng: -74.5946, town: Plainsboro}
+  - id: raritan
+    label: "Raritan (town center)"
+    lat: 40.5671
+    lng: -74.6347
+    town: Raritan
+    aliases: [raritan nj, raritan new jersey, raritan borough, raritan town center]
+    source: >-
+      OpenStreetMap via Nominatim: Raritan borough, Somerset County, NJ (relation 170844),
+      center 40.5671022, -74.6347275. © OpenStreetMap contributors, ODbL 1.0. Retrieved 2026-10-14.
 destinations:
   - id: times-square
     label: "Times Square (1540 Broadway)"
@@ -42,3 +55,24 @@ destinations:
     lng: -73.9840
     in_congestion_relief_zone: true
     parking_area: midtown-manhattan
+  - id: javits-center
+    label: "Javits Center (429 11th Ave)"
+    lat: 40.7584
+    lng: -74.0022
+    aliases:
+      - javits
+      - javits center
+      - javits convention center
+      - jacob javits center
+      - jacob k javits center
+      - jacob k javits convention center
+      - jacob javits convention center
+    # Human-confirmed 2026-10-14 (Umair): inside the zone. 11th Ave at W 34th-40th St is a local
+    # street south of 60 St; the zone excludes only Route 9A (12th Ave), FDR Dr, Carey Tunnel links.
+    in_congestion_relief_zone: true
+    # Unknown on purpose (human decision 2026-10-14): no sourced garage rate near Javits; the only
+    # area on file is a W 46th St garage ~1 mile away, and borrowing its price would be a guess.
+    parking_area: null
+    source: >-
+      OpenStreetMap: Jacob K. Javits Convention Center, 429 11th Ave, New York, NY,
+      40.7584, -74.0022. © OpenStreetMap contributors, ODbL 1.0. Retrieved 2026-10-14.
