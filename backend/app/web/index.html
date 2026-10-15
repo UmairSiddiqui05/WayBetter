@@ -147,6 +147,21 @@
   .num .alt { display: block; font-size: 12px; color: var(--ink-2); }
   .badge { justify-self: start; font-size: 11px; font-weight: 750; padding: 1px 7px; border-radius: 4px; border: 1px solid #cfd2d6; color: var(--ink-2); }
   .badge.best { background: var(--good); border-color: var(--good); color: #fff; }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; }
+  .hidden-opts { margin-top: 10px; }
+  .hidden-opts li b { font-weight: 700; }
+  .maplinks { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: 13px; }
+  .maplinks a { color: var(--ink-2); }
+  /* Compare: options side by side, widened panel */
+  main.wide { grid-template-columns: min(860px, 62vw) minmax(0, 1fr); }
+  .cmp-wrap { overflow-x: auto; contain: paint; margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius); }
+  .cmp { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 14px; }
+  .cmp th, .cmp td { padding: 8px 10px; border-top: 1px solid var(--soft); text-align: right; white-space: nowrap; vertical-align: top; }
+  .cmp thead th { border-top: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--ink); font-weight: 750;
+    white-space: normal; min-width: 110px; max-width: 150px; text-align: right; }
+  .cmp th[scope=row], .cmp thead th:first-child { position: sticky; left: 0; background: var(--panel); text-align: left;
+    font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; min-width: 104px; }
+  .cmp .sub { white-space: normal; font-weight: 500; }
   .bars { display: grid; gap: 3px; }
   .bar, .bar-labels { display: flex; gap: 2px; }
   .bar { height: 8px; border-radius: 2px; overflow: hidden; }
@@ -221,6 +236,10 @@
   fieldset { border: 0; padding: 0; margin: 14px 0 0; }
   .radio { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
   .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  input.num { width: 100%; padding: 8px 10px; border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; }
+  input.num:invalid { border-color: var(--bad); }
+  .check { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 
   footer.foot { padding: 10px 16px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
   .linkish { border: 0; background: none; padding: 0; color: var(--ink-2); text-decoration: underline; cursor: pointer; font-size: inherit; }
@@ -254,6 +273,7 @@
   @media (max-width: 860px) {
     main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 42vh auto; height: auto; }
     #map { height: 42vh; order: -1; }
+    main.wide { grid-template-columns: minmax(0, 1fr); }
     aside { border-right: 0; overflow: visible; }
     .view { padding: 12px 16px 8px; }
   }
@@ -278,6 +298,7 @@
 <nav class="drawer" id="drawer" aria-label="Menu" hidden>
   <div class="logo"><div>Way<span>Better</span></div> <button class="icon-btn" id="drawer-close" type="button" aria-label="Close menu"></button></div>
   <button class="nav" type="button" data-view="plan"></button>
+  <button class="nav" type="button" data-view="compare"></button>
   <button class="nav" type="button" data-view="settings"></button>
   <button class="nav" type="button" data-view="sources"></button>
   <button class="nav" type="button" data-view="about"></button>
@@ -330,7 +351,15 @@
       </div>
       <div id="status" role="status" aria-live="polite"></div>
       <ol class="rows" id="list" aria-label="Ranked options"></ol>
+      <div id="hidden-opts"></div>
       <div id="detail" hidden></div>
+    </section>
+
+    <section class="view" id="view-compare" hidden>
+      <div class="view-title"><button class="back" type="button" data-view="plan"></button></div>
+      <h2>Compare options</h2>
+      <p class="hint">Every option from the last comparison, side by side, in the server's ranking. A badge means that option alone wins on it; a tie gets none.</p>
+      <div id="compare"><p class="hint">Run a comparison to see it here.</p></div>
     </section>
 
     <section class="view" id="view-settings" hidden>
@@ -343,6 +372,20 @@
         <legend class="label">Tolls paid with</legend>
         <label class="radio"><input type="radio" name="toll" value="ezpass"> E-ZPass</label>
         <label class="radio"><input type="radio" name="toll" value="cash"> Cash / toll by mail</label>
+      </fieldset>
+      <fieldset>
+        <legend class="label">Your car</legend>
+        <div class="set-grid">
+          <label class="field"><span>Miles per gallon</span><input class="num" id="set-mpg" type="number" inputmode="decimal" min="1" max="150" step="0.1"></label>
+          <label class="field"><span>Gas price ($/gal)</span><input class="num" id="set-gas" type="number" inputmode="decimal" min="0.01" max="20" step="0.001"></label>
+        </div>
+        <p class="hint" id="car-hint"></p>
+      </fieldset>
+      <fieldset>
+        <legend class="label">Filters</legend>
+        <label class="check"><input type="checkbox" id="set-avoid-tolls"> Avoid tolls (incl. the congestion toll)</label>
+        <label class="field"><span>Longest walk (minutes, blank = any)</span><input class="num" id="set-walk" type="number" inputmode="numeric" min="0" max="120" step="1"></label>
+        <p class="hint">Options a filter hides are listed under the results with the reason, never dropped silently.</p>
       </fieldset>
       <div class="settings-actions">
         <button class="primary" id="settings-done" type="button">Save and compare</button>
@@ -431,7 +474,7 @@ const titleCase = (s) => String(s).toLowerCase().replace(/(^|[\s(/-])([a-z])/g, 
 $("menu-btn").innerHTML = ic("menu");
 $("drawer-close").innerHTML = ic("x");
 $("swap").innerHTML = ic("arrow-up-down");
-const NAV = { plan: ["map", "Plan a trip"], settings: ["settings", "Settings"], sources: ["database", "Data sources"], about: ["info", "About and limitations"] };
+const NAV = { plan: ["map", "Plan a trip"], compare: ["equal-approximately", "Compare options"], settings: ["settings", "Settings"], sources: ["database", "Data sources"], about: ["info", "About and limitations"] };
 document.querySelectorAll(".nav").forEach((b) => { const [i, t] = NAV[b.dataset.view]; b.innerHTML = `${ic(i)}${t}`; });
 document.querySelectorAll(".view-title .back").forEach((b) => { b.innerHTML = `${ic("arrow-left")}Back to trip`; });
 $("prov-legend").innerHTML = `<span>Numbers that are</span>${legendHtml(false)}`;
@@ -484,14 +527,20 @@ if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(PARAMS.get("at") || "")) $("when").va
 
 // ---- Settings (localStorage is a convenience; every access may throw) ----------------------
 const STORE_KEY = "waybetter.settings.v1";
-const DEFAULTS = { home: PRESETS.default_return_time, toll: "ezpass" };
+// mpg / gas / walk: null = not set (the server then uses its data-file averages / no limit).
+const DEFAULTS = { home: PRESETS.default_return_time, toll: "ezpass", mpg: null, gas: null, avoidTolls: false, walk: null };
+const inRange = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v > lo && v <= hi) ? v : null;
+const cleanSettings = (s) => ({
+  home: /^([01]\d|2[0-3]):[0-5]\d$/.test(s.home) ? s.home : DEFAULTS.home,
+  toll: s.toll === "cash" ? "cash" : "ezpass",
+  mpg: inRange(s.mpg, 0, 150), gas: inRange(s.gas, 0, 20),
+  avoidTolls: s.avoidTolls === true,
+  walk: Number.isInteger(s.walk) && s.walk >= 0 && s.walk <= 120 ? s.walk : null,
+});
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if (s && typeof s === "object") return {
-      home: /^([01]\d|2[0-3]):[0-5]\d$/.test(s.home) ? s.home : DEFAULTS.home,
-      toll: s.toll === "cash" ? "cash" : "ezpass",
-    };
+    if (s && typeof s === "object") return cleanSettings(s);
   } catch (e) { /* storage blocked or corrupt: use defaults */ }
   return { ...DEFAULTS };
 }
@@ -500,18 +549,36 @@ function saveSettings(s) {
 }
 let settings = loadSettings();
 function renderChips() {
-  $("chips").innerHTML =
-    `<button type="button" class="chip" data-view="settings" aria-label="Head home at ${esc(hhmm(settings.home))}, change in Settings">${ic("moon", "sm")}Home ${esc(hhmm(settings.home))}</button>
-     <button type="button" class="chip" data-view="settings" aria-label="Tolls paid with ${settings.toll === "cash" ? "cash" : "E-ZPass"}, change in Settings">${ic("car", "sm")}${settings.toll === "cash" ? "Cash tolls" : "E-ZPass"}</button>`;
+  const chip = (icon, text, label) => `<button type="button" class="chip" data-view="settings" aria-label="${esc(label)}, change in Settings">${ic(icon, "sm")}${esc(text)}</button>`;
+  $("chips").innerHTML = [
+    chip("moon", `Home ${hhmm(settings.home)}`, `Head home at ${hhmm(settings.home)}`),
+    chip("car", settings.toll === "cash" ? "Cash tolls" : "E-ZPass", `Tolls paid with ${settings.toll === "cash" ? "cash" : "E-ZPass"}`),
+    settings.mpg !== null ? chip("car", `${settings.mpg} mpg`, `Your car: ${settings.mpg} miles per gallon`) : "",
+    settings.gas !== null ? chip("car", `$${settings.gas.toFixed(2)}/gal`, `Your gas price: $${settings.gas} a gallon`) : "",
+    settings.avoidTolls ? chip("triangle-alert", "Avoid tolls", "Filter: avoid tolls") : "",
+    settings.walk !== null ? chip("footprints", `Walk ≤ ${settings.walk} min`, `Filter: walk at most ${settings.walk} minutes`) : "",
+  ].join("");
 }
+const VD = PRESETS.vehicle_defaults;
+$("set-mpg").placeholder = VD ? `${VD.mpg} (average)` : "";
+$("set-gas").placeholder = VD ? `${VD.usd_per_gallon} (average)` : "";
+$("car-hint").textContent = VD ? `Blank = the averages from the data files (${VD.mpg} mpg, $${VD.usd_per_gallon}/gal, both estimated). A number you enter is marked "your value" on every cost.` : "";
 function fillSettingsForm() {
   $("set-home").value = settings.home;
   document.querySelectorAll("input[name=toll]").forEach((r) => { r.checked = r.value === settings.toll; });
+  $("set-mpg").value = settings.mpg ?? ""; $("set-gas").value = settings.gas ?? "";
+  $("set-avoid-tolls").checked = settings.avoidTolls; $("set-walk").value = settings.walk ?? "";
 }
 renderChips();
+const numOrNull = (el) => el.value.trim() === "" ? null : Number(el.value);
 $("settings-done").addEventListener("click", () => {
-  const home = $("set-home").value;
-  settings = { home: home || DEFAULTS.home, toll: document.querySelector("input[name=toll]:checked")?.value === "cash" ? "cash" : "ezpass" };
+  for (const id of ["set-mpg", "set-gas", "set-walk"]) if (!$(id).checkValidity()) { $(id).reportValidity(); return; }
+  settings = cleanSettings({
+    home: $("set-home").value || DEFAULTS.home,
+    toll: document.querySelector("input[name=toll]:checked")?.value,
+    mpg: numOrNull($("set-mpg")), gas: numOrNull($("set-gas")),
+    avoidTolls: $("set-avoid-tolls").checked, walk: numOrNull($("set-walk")),
+  });
   saveSettings(settings); renderChips(); showView("plan"); search();
 });
 $("settings-reset").addEventListener("click", () => { settings = { ...DEFAULTS }; fillSettingsForm(); });
@@ -532,7 +599,9 @@ function openDrawer(open) {
   if (open) $("drawer").querySelector(".nav").focus(); else $("menu-btn").focus();
 }
 function showView(name) {
-  for (const v of ["plan", "settings", "sources", "about"]) $(`view-${v}`).hidden = v !== name;
+  for (const v of ["plan", "compare", "settings", "sources", "about"]) $(`view-${v}`).hidden = v !== name;
+  document.querySelector("main").classList.toggle("wide", name === "compare");
+  if (name === "compare") renderCompare();
   document.querySelectorAll(".nav").forEach((b) => b.dataset.view === name
     ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   if (name === "settings") fillSettingsForm();
@@ -646,7 +715,7 @@ function drawRoutes(routes, selected) {
 }
 
 // ---- Rows -----------------------------------------------------------------------------------
-let session = null, current = [], selected = 0, sortMode = null, sortOptions = [], period = "trip", lastQuery = null;
+let session = null, current = [], hiddenRoutes = [], selected = 0, sortMode = null, sortOptions = [], period = "trip", lastQuery = null;
 
 // The three server numbers a row can lead with. Picks fields; never computes one.
 function figures(r) {
@@ -664,14 +733,11 @@ function figures(r) {
 const railLeg = (r) => r.legs.find((l) => legKind(l) === "rail");
 const rowTitle = (r) => { const t = railLeg(r); return t && t.start_location.label ? titleCase(t.start_location.label) : r.summary; };
 const rowSub = (r) => railLeg(r) ? r.summary : `${r.drive_miles} mi by car`;
-// One tag per row: the server's label for the active ranking tab when the row has it, else its
-// first (primary) label.
-const firstTag = (r) => {
-  const tags = (r.label || "").split(" · ").filter(Boolean);
-  const active = humanize(sortMode || sortOptions[0] || "");
-  return tags.includes(active) ? active : tags[0];
-};
-const tagHtml = (r) => { const t = firstTag(r); return t ? `<span class="badge ${t === humanize(sortMode || sortOptions[0] || "") ? "best" : ""}">${esc(t)}</span>` : ""; };
+// The server's badges (unique winners only); the one matching the active ranking tab is filled.
+const activeSort = () => sortMode || sortOptions[0] || "";
+const tagHtml = (r) => (r.badges || []).length ? `<div class="badges">${r.badges.map((b) =>
+  `<span class="badge ${b.id === activeSort() ? "best" : ""}">${esc(b.text)}</span>`).join("")}</div>` : "";
+const co2Text = (e) => e ? `${val(e.amount === null ? "unknown" : `${e.amount.toFixed(1)} kg`, e.provenance)} CO₂` : "";
 
 const KIND_WORD = { car: "Drive", rail: "Train", subway: "Subway", walk: "Walk", wait: "Wait" };
 const MODE_ICON = { car: "car", rail: "train-front", subway: "tram-front", walk: "footprints" };
@@ -722,6 +788,7 @@ function metaHtml(r) {
   if (first && last) parts.push(val(range(first.start_time, last.end_time), timeProv(r.legs)));
   const s = r.round_trip && r.round_trip.savings_vs_drive;
   if (s) parts.push(`<span class="save">${period === "month" ? savedText(s.monthly, "a month") : savedText(s.daily, "a day")}</span>`);
+  if (r.emissions_kg) parts.push(co2Text(r.emissions_kg));
   return parts.join(" · ");
 }
 function renderRows() {
@@ -765,8 +832,10 @@ function stepsHtml(legs) {
   return `<ol class="steps">${legs.map((leg) => {
     const k = legKind(leg);
     const sub = [leg.distance_miles ? `${leg.distance_miles} mi` : "", leg.headsign ? `toward ${esc(titleCase(leg.headsign))}` : ""].filter(Boolean).join(" · ");
+    const links = (leg.map_links || []).length ? `<div class="maplinks">${leg.map_links.map((m) =>
+      `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Open in ${esc(m.label)} ${ic("external-link", "sm")}</a>`).join("")}</div>` : "";
     return `<li><span class="mode-ic ${k}">${ic(MODE_ICON[k])}</span>
-      <div><div class="step-t">${stepTitle(leg)}</div><div class="step-s">${val(range(leg.start_time, leg.end_time), leg.time_provenance)}${sub ? ` · ${sub}` : ""}</div></div>
+      <div><div class="step-t">${stepTitle(leg)}</div><div class="step-s">${val(range(leg.start_time, leg.end_time), leg.time_provenance)}${sub ? ` · ${sub}` : ""}</div>${links}</div>
       <div class="step-r">${val(mins(leg.duration_minutes), leg.time_provenance)}<br>${word(leg.time_provenance)}</div></li>`;
   }).join("")}</ol>`;
 }
@@ -805,6 +874,7 @@ function detailHtml(r) {
       ${tile("Per day", rt ? rt.daily_cost_breakdown.total : null, rt ? totalProv(rt.daily_cost_breakdown) : "unknown")}
       ${tile("Per month", rt ? rt.monthly_cost.amount : null, rt ? rt.monthly_cost.provenance : "unknown")}
     </div>
+    ${r.emissions_kg ? `<p class="hint">${co2Text(r.emissions_kg)} for this trip ${word(r.emissions_kg.provenance)}${r.emissions_kg.note ? ` · ${esc(r.emissions_kg.note)}` : ""}</p>` : ""}
     <h3>Morning · ${val(mins(r.total_minutes), timeProv(r.legs))}</h3>
     ${stepsHtml(r.legs)}
     ${rt ? `<details>${summaryHtml(`Evening: ${esc(rt.return_summary)} ${word(timeProv(rt.return_legs))}`)}<div class="body">${stepsHtml(rt.return_legs)}</div></details>`
@@ -825,12 +895,12 @@ function detailHtml(r) {
 function openDetail(idx) {
   select(idx);
   $("detail").innerHTML = detailHtml(current[idx]);
-  $("detail").hidden = false; $("list").hidden = true; $("results-controls").hidden = true; $("status").hidden = true;
+  $("detail").hidden = false; $("list").hidden = true; $("results-controls").hidden = true; $("status").hidden = true; $("hidden-opts").hidden = true;
   if (matchMedia("(max-width: 860px)").matches) $("detail").scrollIntoView({ block: "start" }); else $("panel").scrollTop = 0;
   $("detail-back").focus();
 }
 function closeDetail() {
-  $("detail").hidden = true; $("list").hidden = false; $("results-controls").hidden = !current.length; $("status").hidden = false;
+  $("detail").hidden = true; $("list").hidden = false; $("results-controls").hidden = !current.length; $("status").hidden = false; $("hidden-opts").hidden = false;
   const row = $("list").querySelector(`[data-idx="${selected}"]`);
   if (row) row.focus();
 }
@@ -845,6 +915,43 @@ $("list").addEventListener("keydown", (e) => {
   if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDetail(Number(row.dataset.idx)); }
 });
 $("detail").addEventListener("click", (e) => { if (e.target.closest("#detail-back")) closeDetail(); });
+
+// ---- Options the filters hid (response.filtered_out): shown with the server's reasons -------
+function renderHidden() {
+  $("hidden-opts").innerHTML = hiddenRoutes.length ? `<details class="hidden-opts" ${current.length ? "" : "open"}>${summaryHtml(
+    `${ic("triangle-alert", "sm")} Hidden by your filters (${hiddenRoutes.length})`)}<div class="body"><ul class="plain">${
+    hiddenRoutes.map((h) => `<li><b>${esc(h.summary)}</b><ul class="plain">${h.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></li>`).join("")}</ul>
+    <button type="button" class="linkish" data-view="settings">Change filters in Settings</button></div></details>` : "";
+}
+
+// ---- Compare view: every option side by side, straight from the response -------------------
+// The page picks fields and lays them out; who wins what is the server's badges row.
+function renderCompare() {
+  if (!current.length) {
+    $("compare").innerHTML = `<p class="hint">${hiddenRoutes.length ? "Your filters hide every option." : "Run a comparison to see it here."}</p>`;
+    return;
+  }
+  const f = (r) => figures(r);
+  const rows = [
+    ["Badges", (r) => (r.badges || []).map((b) => `<span class="badge">${esc(b.text)}</span>`).join("<br>") || "—"],
+    ["Door to door", (r) => val(dur(r.total_minutes), timeProv(r.legs))],
+    ["One way", (r) => val(money(f(r).trip.amount), f(r).trip.prov)],
+    ["Per day", (r) => val(money(f(r).day.amount), f(r).day.prov)],
+    ["Per month", (r) => val(money(f(r).month.amount), f(r).month.prov)],
+    ["Driving", (r) => val(mins(r.drive_minutes), timeProv(r.legs))],
+    ["Transfers", (r) => esc(String(r.transfer_count))],
+    ["CO₂ (one way)", (r) => r.emissions_kg ? val(r.emissions_kg.amount === null ? "unknown" : `${r.emissions_kg.amount.toFixed(1)} kg`, r.emissions_kg.provenance) : val("unknown", "unknown")],
+  ];
+  $("compare").innerHTML = `<div class="cmp-wrap"><table class="cmp"><thead><tr><th scope="col">Option</th>${
+    current.map((r, i) => `<th scope="col"><button type="button" class="linkish" data-cmp="${i}">${esc(rowTitle(r))}</button><div class="sub hint">${esc(rowSub(r))}</div></th>`).join("")}</tr></thead>
+    <tbody>${rows.map(([name, cell]) => `<tr><th scope="row">${name}</th>${current.map((r) =>
+      `<td>${cell(r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    ${hiddenRoutes.length ? `<p class="hint">${hiddenRoutes.length} more hidden by your filters: ${hiddenRoutes.map((h) => esc(h.summary)).join(", ")}.</p>` : ""}`;
+}
+$("compare").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cmp]");
+  if (b) { showView("plan"); openDetail(Number(b.dataset.cmp)); }
+});
 
 // ---- Sort tabs (from response.sort_options; ranking stays on the server) and period toggle ---
 function renderSorts() {
@@ -915,8 +1022,8 @@ async function search() {
       destination: { lat: d.lat, lng: d.lng, label: d.label },
       time_mode: "leave_at", target_time: $("when").value + ":00",
       return_time: settings.home || null,
-      vehicle_profile: { toll_payment: settings.toll },
-      ...(sortMode ? { preferences: { sort_mode: sortMode } } : {}),
+      vehicle_profile: { toll_payment: settings.toll, mpg: settings.mpg, fuel_price_per_gallon: settings.gas },
+      preferences: { ...(sortMode ? { sort_mode: sortMode } : {}), avoid_tolls: settings.avoidTolls, max_walk_minutes: settings.walk },
     };
     const post = async () => fetch("/api/v1/trip/search", { method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify(body) });
@@ -926,13 +1033,16 @@ async function search() {
     if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
     if (ticket !== inflight) return;
     lastQuery = { origin: body.origin, destination: body.destination };
-    current = data.routes; selected = 0; sortOptions = data.sort_options || [];
-    renderSorts(); renderRows();
-    $("detail").hidden = true; $("list").hidden = false; $("status").hidden = false;
+    current = data.routes; hiddenRoutes = data.filtered_out || []; selected = 0; sortOptions = data.sort_options || [];
+    renderSorts(); renderRows(); renderHidden();
+    if (!$("view-compare").hidden) renderCompare();
+    $("detail").hidden = true; $("list").hidden = false; $("status").hidden = false; $("hidden-opts").hidden = false;
     $("results-controls").hidden = !current.length;
-    if (!current.length) $("list").innerHTML = `<li class="hint">No options could be computed for this trip. See About and limitations.</li>`;
+    if (!current.length) $("list").innerHTML = hiddenRoutes.length
+      ? `<li class="hint">Your filters hide every option. The reasons are below; change them in Settings.</li>`
+      : `<li class="hint">No options could be computed for this trip. See About and limitations.</li>`;
     $("disclaimers").innerHTML = data.disclaimers.map((t) => `<li>${esc(t)}</li>`).join("");
-    $("status").textContent = `${current.length} options · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    $("status").textContent = `${current.length} options${hiddenRoutes.length ? ` (${hiddenRoutes.length} hidden by filters)` : ""} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
     if (current.length) drawRoutes(current, 0); else layer.clearLayers();
   } catch (err) {
     if (ticket !== inflight) return;
@@ -1013,7 +1123,7 @@ function fillFromDraft() {
   }
   if (d.target_time) $("when").value = d.target_time.slice(0, 16);  // local time as sent, minus seconds/offset
   // For this page view only (not saved): the draft's home time, else the corridor default it reported.
-  settings = { home: d.return_time || DEFAULTS.home, toll: d.vehicle_profile.toll_payment === "cash" ? "cash" : "ezpass" };
+  settings = { ...settings, home: d.return_time || DEFAULTS.home, toll: d.vehicle_profile.toll_payment === "cash" ? "cash" : "ezpass" };
   renderChips();
   sortMode = d.preferences.sort_mode || null;
   if (sortOptions.length) renderSorts();

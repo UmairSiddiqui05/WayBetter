@@ -100,8 +100,24 @@ def _data_sources_for(corridor: Corridor) -> tuple[dict[str, Any], ...]:
     for vehicle in pricing.vehicle_defaults:
         rows.append(_source_row("Gas price", "Regular gasoline", vehicle.gasoline))
         rows.append(_source_row("Fuel economy", "Average new car", vehicle.fuel_economy))
+    for factors in pricing.emission_factors:
+        rows.append(_source_row("CO2 factor", "Gasoline, per gallon", factors.gasoline))
+        rows += [
+            _source_row("CO2 factor", f"{', '.join(f.modes)}, per passenger-mile", f)
+            for f in factors.transit
+        ]
     rows.append(_source_row("Working days", "Commute days per year", corridor.commute))
     return tuple(rows)
+
+
+def _vehicle_defaults() -> dict[str, float] | None:
+    """The data-file averages the server uses when the user leaves Settings blank (placeholders
+    only; the page never computes with them)."""
+    pricing = load_pricing_data(get_region_config())
+    if not pricing.vehicle_defaults:
+        return None
+    vehicle = pricing.vehicle_defaults[0]
+    return {"mpg": vehicle.fuel_economy.mpg, "usd_per_gallon": vehicle.gasoline.usd_per_gallon}
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -120,6 +136,7 @@ def demo_page(service: Annotated[TripSearchService, Depends(get_trip_service)]) 
             "%Y-%m-%dT%H:%M"
         ),
         "default_return_time": corridor.commute.default_return_time,
+        "vehicle_defaults": _vehicle_defaults(),
         "data_sources": list(_data_sources_for(corridor)),
     }
     html = TEMPLATE.read_text(encoding="utf-8").replace(

@@ -105,3 +105,40 @@ def test_plain_words_never_search_without_the_user_confirming(page: str) -> None
     reading = page[page.index("async function ask()") : page.index('$("ask-go").addEventListener')]
     assert "search(" not in reading
     assert "fillFromDraft" not in reading
+
+
+# -- D-21: badges, settings, filters, CO2, map links, Compare (renderer only, N-01) ------------
+
+
+def test_rows_render_server_badges_not_a_label_string() -> None:
+    assert "r.badges" in PAGE
+    assert "r.label" not in PAGE  # v0.8.0 removed RouteOption.label
+
+
+def test_settings_send_vehicle_values_and_filters_in_the_request() -> None:
+    for field in ("mpg: settings.mpg", "fuel_price_per_gallon: settings.gas"):
+        assert field in PAGE
+    for field in ("avoid_tolls: settings.avoidTolls", "max_walk_minutes: settings.walk"):
+        assert field in PAGE
+
+
+def test_vehicle_averages_are_injected_for_the_settings_placeholders(page: str) -> None:
+    defaults = presets(page)["vehicle_defaults"]
+
+    assert defaults["mpg"] > 0 and defaults["usd_per_gallon"] > 0
+
+
+def test_co2_factors_are_listed_as_data_sources(page: str) -> None:
+    co2 = [s for s in presets(page)["data_sources"] if s["category"] == "CO2 factor"]
+
+    assert len(co2) >= 3
+    assert all(
+        s["status"] == "estimated" and s["url"].startswith("https://www.epa.gov") for s in co2
+    )
+
+
+def test_hidden_options_compare_view_and_map_links_render_from_the_response() -> None:
+    assert "data.filtered_out" in PAGE and "h.reasons" in PAGE
+    assert 'data-view="compare"' in PAGE and "function renderCompare" in PAGE
+    assert "leg.map_links" in PAGE and 'rel="noopener noreferrer"' in PAGE
+    assert "r.emissions_kg" in PAGE
