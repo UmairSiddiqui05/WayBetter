@@ -561,3 +561,13 @@ def test_least_driving_is_offered_as_a_sort(service: TripSearchService) -> None:
     assert "least_driving" in out.sort_options
     drives = [r.drive_minutes for r in out.routes]
     assert drives == sorted(drives)
+
+
+def test_schedule_disclaimer_names_the_agency_from_region_config(
+    service: TripSearchService,
+) -> None:
+    # N-03: no agency names in code; the feed registry in region config supplies it.
+    disclaimers = service.search(request(), NOW).disclaimers
+
+    assert "Train times are NJ Transit Rail's published schedule, not real-time." in disclaimers
+    assert not any("NJ TRANSIT's published" in d for d in disclaimers)

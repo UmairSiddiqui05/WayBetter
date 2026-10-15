@@ -1208,8 +1208,13 @@ class TripSearchService:
 
     def _disclaimers(self) -> list[str]:
         vehicle = self._vehicle()
+        # The agency comes from the feed registry in region config, never from code (N-03).
+        feed = next(
+            (f for f in self._region.feeds if f.feed_id == self._corridor.transit_feed), None
+        )
+        agency = feed.agency_name if feed else "the agency"
         return [
-            "Train times are NJ TRANSIT's published schedule, not real-time.",
+            f"Train times are {agency}'s published schedule, not real-time.",
             "Drive times are free-flow estimates from OpenStreetMap data "
             "(© OpenStreetMap contributors); they ignore live traffic.",
             f"Driving cost is {vehicle.cost_scope[0].lower()}{vehicle.cost_scope[1:]}",
