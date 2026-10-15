@@ -14,9 +14,10 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## In progress
 
-- **D-21 post-sprint batch** (Claude, 2026-10-15) — items 17 (sorts + structured badges), 18
-  (emissions + cleanest), 19 (mpg / fuel price settings), 21 (avoid tolls, max walk filters), 35
-  (map-app handoff links), 11 (Compare view). API v0.8.0. Emission factors await the human spot-check.
+- **D-21 post-sprint batch** (Claude, 2026-10-15) — items 17, 19, 21, 35, 11 **done and verified
+  in the browser**; item 18 (CO₂ + cleanest) built and verified but **awaits the human spot-check
+  of the EPA factors** (`data/emissions/epa_emission_factors.yaml`) before it counts as done.
+  API v0.8.0. See the work log.
 
 - **DEMO SPRINT (D-18) — CLOSED 2026-10-15** (human-confirmed). See [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
@@ -57,9 +58,9 @@ The single source of truth for **what is done, what is in progress, and what com
 ## Phase 2 — Cost, parking, scoring
 - [ ] Fare tables (effective-dated) + fare service (F-12)
 - [ ] Toll geometries + congestion zone + toll estimator (F-13)
-- [ ] Gas/EV/emissions estimators (F-14)
+- [ ] Gas/EV/emissions estimators (F-14) — gas with the user's own mpg / gas price and tailpipe CO₂ (EPA factors, D-21) on the demo corridor; EV profile not started; factors await the human spot-check
 - [ ] Parking service + confidence rules + remaining seed stations (~60–75 total)
-- [ ] Scoring engine: filters/weights/sort keys + all 7 launch sorts + unit tests (F-06, F-07)
+- [ ] Scoring engine: filters/weights/sort keys + all 7 launch sorts + unit tests (F-06, F-07) — on the demo engine (D-21): 7 sorts (best overall, fastest, cheapest, least/most driving, fewest transfers, cleanest), unique-winner badges, avoid-tolls + max-walk filters with reasons, unit tests per sort/filter/tie rule. Still open: best_parking (needs occupancy data), avoid_city_driving (needs the zone polygons), weights (cost_sensitivity, driving_penalty)
 - [ ] Golden-fixture regression suite (N-10)
 
 ## Phase 3 — AI layer
@@ -82,6 +83,25 @@ The single source of truth for **what is done, what is in progress, and what com
 - [ ] App Store submission
 
 ## Backlog / discovered
+
+- **Toll-free routing for avoid_tolls (D-21, found 2026-10-15):** the public OSRM server answers
+  `exclude=toll` with "Exclude flag combination is not supported", so the filter prices OSRM's
+  alternatives with our toll files and hides the option when none is $0. Mapbox Directions
+  `exclude=toll` on every candidate (PLAN §6) replaces this; a self-hosted OSRM with the car
+  profile's `toll` exclude class is the free alternative.
+- **Human spot-check: EPA CO₂ factors** (item 18 is not done until this happens): 8.887 kg/gal,
+  0.133 and 0.093 kg per passenger-mile in `data/emissions/epa_emission_factors.yaml`, read from
+  the EPA page and the 2025 Hub xlsx (Table 10). Set `human_verified: true` after checking.
+- **best_parking sort** is in the contract enum but rejected by the server (422) until lot
+  occupancy/confidence data exists; offering it now would rank on nothing.
+- **Agency name in code (N-03):** `TripSearchService._disclaimers()` says "NJ TRANSIT's published
+  schedule"; it should come from the feed's `agency_name` in region config. Pre-existing (demo
+  sprint), found 2026-10-15.
+- **Daily CO₂:** `emissions_kg` covers the morning trip only; a `RoundTrip.daily_emissions_kg`
+  would let the Day/Month toggle show CO₂ too (contract change).
+- **TripSearchDraft.preferences** in the contract still lists only the four sorts the parser can
+  produce, and does not mention avoid_tolls / max_walk_minutes (the draft serializes them with
+  their defaults). Align when the parser learns the new preferences.
 
 - **Turnpike 15X → 14-14C not in the toll data** (found 2026-10-14): Secaucus's trip home from
   Javits shows its tolls as unknown, so its day and month totals are unknown. Add the pair from the
@@ -166,6 +186,57 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-15 — Claude (post-sprint batch, D-21 — human-approved items 17, 18, 19, 21, 35, 11):**
+  (0) **Demo sprint CLOSED** (human confirmed): DEMO-SPRINT.md status CLOSED, CLAUDE.md override
+  block replaced by a closed note, D-21 logged (amends D-14: `cleanest` is an 8th UI sort).
+  **API v0.8.0** (one bump for all contract changes; `backend/app/__init__.py` matches; redocly
+  lint: 15 warnings, the same 15 as v0.7.0; `test_openapi_parity.py` green).
+  (17) Sorts `least_driving`, `most_driving`, `fewest_transfers` (+ `cleanest`); ties on a mode's
+  metric fall back to door-to-door time. **BREAKING:** `RouteOption.label` → `badges [{id, text}]`.
+  A badge only for a unique winner at display precision (whole minutes, cents, 0.1 kg, transfer
+  count); none on a tie, none for a lone option; cost badges among complete totals only, cleanest
+  among known CO₂ only; `most_driving` is a tab, never a badge.
+  (18) `emissions_kg` per option (kg CO₂, morning trip): gallons × 8.887 kg/gal (EPA passenger
+  vehicle page) + rail passenger-miles × EPA Hub 2025 Table 10 (commuter rail 0.133, transit rail
+  0.093), factor chosen by the feed's `modes` in region config (no agency in code). Rail miles come
+  from the GTFS shape polyline (new `distance_miles` on train legs); unknown distance → unknown
+  CO₂. New data file + `EmissionFactors` schema + `DataFiles.emissions_dir`. Factors read by
+  extracting the Hub xlsx locally (the PDF wouldn't parse); **awaiting the human spot-check**.
+  (19) `vehicle_profile.mpg` (0–150] and `fuel_price_per_gallon` (0–20]: notes say "(your value)",
+  provenance `user_reported`; `costs.worst()` now orders unknown > ai_generated > user_reported >
+  estimated > live > scheduled (as the page already did). User mpg also drives the CO₂ estimate.
+  (21) `preferences.avoid_tolls` and `max_walk_minutes`: hidden options go to the new
+  `TripSearchResponse.filtered_out [{route_id, summary, reasons}]`. **Surprise:** the public OSRM
+  server rejects `exclude=toll`; with the human's choice, avoid_tolls asks OSRM for alternatives
+  (`DrivingProvider.route_options`, new) and uses one our toll files price at $0, else hides the
+  option with each priced toll (both trips; the congestion toll counts). Badges and ranking apply
+  to the remaining options.
+  (35) `RouteLeg.map_links` on every car leg (both trips): Google Maps / Apple Maps URLs from
+  `map_handoff` templates in `data/regions/nyc-metro.yaml` (schema allows only the four end
+  coordinates, https only).
+  (11) Page (renderer only): badges (the active tab's filled), 7 tabs from `sort_options`,
+  Settings for mpg / gas price (placeholders = injected data-file averages) and both filters,
+  chips for active ones, "Hidden by your filters" with the server's reasons, CO₂ on rows and
+  detail, map links on drive steps, **Compare options** view (menu; widens the panel; options as
+  columns: badges, door to door, one way, day, month, driving, transfers, CO₂). An existing page
+  test bans sort ids in the template, so Compare shows a badges row instead of per-cell winners.
+  Data sources view lists the CO₂ factors.
+  **Verified** on the dev server (port 8020, real NJ TRANSIT GTFS + cached OSRM), Princeton →
+  Times Square Fri 10/16 7:00: badges Metropark *Best overall · Cheapest*, Princeton Jct *Least
+  driving · Cleanest* (7.7 kg), Drive *Fastest*; no *Fewest transfers* (all 0). Avoid tolls hides
+  Drive ($27.08 tolls + $6.00 congestion + $10.29 home) and Secaucus (home Turnpike 15X→9 $9.42)
+  with reasons; max walk 8 hides every park-and-ride; 32 mpg shows "(your value)". Tabs re-rank
+  server-side; no console or server errors; 375 px layout checked (fixed a Compare overflow with
+  `contain: paint`). **Tests:** 297 (+42: every sort, filter and badge tie rule, CO₂, user values,
+  map links, page renderer). ruff + mypy strict clean.
+  Files: `docs/api-spec.yaml`, `backend/app/__init__.py`, `backend/app/trips/{models,costs,service}.py`,
+  `backend/app/providers/{base,osrm}.py`, `backend/app/pricing/{models,loader}.py`,
+  `backend/app/regions/schema.py`, `backend/app/web/{index.html,page.py}`,
+  `backend/tests/{test_trip_search,test_trip_sorts_filters,test_web_page}.py`,
+  `data/emissions/epa_emission_factors.yaml`, `data/regions/nyc-metro.yaml`, `DEMO.md`,
+  `DEMO-SPRINT.md`, `CLAUDE.md`, `DECISIONS.md`, `PROGRESS.md`.
+  Requirements: F-06, F-07, F-14, F-17, F-18, N-01, N-02, N-03, N-09, N-10.
 
 - **2026-10-14 — Claude (D-20 follow-up — voice confirmed, human-tested):** Dictation into
   **Type your trip** works. The human chose Handy's **Parakeet Unified EN 0.6B** model (fast,

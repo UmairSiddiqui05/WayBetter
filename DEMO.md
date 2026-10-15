@@ -9,6 +9,12 @@ adds up to per month and per year compared with driving. You can also **type or 
 plain English**: a local AI model reads it, the page shows what it understood and where each
 value came from, and nothing is searched until you press **Show options**.
 
+> **Updated 2026-10-15 (after the interview; demo sprint closed, D-21, API v0.8.0):** seven
+> ranking tabs (adds Most driving, Fewest transfers, Cleanest), badges only for a unique winner,
+> CO₂ per option from EPA factors, your own mpg and gas price in Settings, two filters (avoid
+> tolls, longest walk) that list what they hide and why, "Open in Google Maps / Apple Maps" on
+> every drive step, and a **Compare options** view in the menu. See step 9 and §3 E.
+
 ---
 
 ## 1. Start it (fresh terminal)
@@ -128,6 +134,17 @@ hard-coded (an unconfirmed business falls back to the town it's in).
    parking as unknown, because we don't have a sourced garage price near the Javits Center."*
    If anything's wrong, click **Change** next to that row; it jumps to the field to fix.
 
+9. **Priorities, filters, side by side (D-21).** Click the **Cleanest** tab. *"Princeton
+   Junction wins on CO₂: a 9-minute drive, then the train. The factors are EPA's, per gallon
+   and per passenger-mile, in a data file with the source, and the number is labeled estimated."*
+   Point at the badges: *"A badge goes only to an outright winner. All five options have zero
+   transfers, so nobody gets 'Fewest transfers'. A tie is not a win."* Open **Settings**, tick
+   **Avoid tolls**, Save. *"Driving all the way and Secaucus disappear, but not silently: under
+   the list it says why, with the exact tolls, and Secaucus is hidden because its drive **home**
+   uses the Turnpike."* Open the menu → **Compare options**: every option in one table. In
+   any option's detail, the drive step has **Open in Google Maps / Apple Maps**. Untick Avoid
+   tolls afterwards.
+
 **Scenario B: Lawrenceville → Bryant Park.** *"Lawrenceville is next to Hamilton station, but
 Hamilton isn't the cheapest choice: its fare is $19.75 and parking is $13, against $13.05 and
 $10 at Metropark. Over a month that's $882 versus $815. The closest station isn't automatically
@@ -142,13 +159,17 @@ different interchange (8A) and is priced correctly from the same official table.
 
 **A. Princeton (Nassau St) → Times Square**
 
-| Option | Morning train | Train home | One-way | Day (round trip) | Month | Saves / month vs driving |
-|---|---|---|---|---|---|---|
-| ⭐ Park at Metropark *(Best overall · Cheapest)* | 7:59 → 8:38 | 6:00 PM, home 7:33 | **$27.60** | **$45.20** | $773.92 | **$1,215.87** |
-| Park at Princeton Jct. | 7:38 → 8:36 | 5:55 PM, home 7:04 | $32.11 | $52.20 | $824.00 | $1,165.79 |
-| Park at Hamilton | 7:30 → 8:36 | 5:55 PM, home 7:22 | $34.49 | $55.96 | $905.92 | $1,083.87 |
-| Park at Secaucus | 8:37 → 8:49 | 5:55 PM, home 7:18 | $53.04 | $75.42 | $1,512.83 | $476.96 |
-| Drive all the way *(Fastest)* | — | leave 5:30, home 6:47 | **$76.17** | **$95.51** | $1,989.79 | — |
+| Option | Morning train | Train home | One-way | Day (round trip) | Month | Saves / month vs driving | CO₂ one way |
+|---|---|---|---|---|---|---|---|
+| ⭐ Park at Metropark *(Best overall · Cheapest)* | 7:59 → 8:38 | 6:00 PM, home 7:33 | **$27.60** | **$45.20** | $773.92 | **$1,215.87** | 12.6 kg |
+| Park at Princeton Jct. *(Least driving · Cleanest)* | 7:38 → 8:36 | 5:55 PM, home 7:04 | $32.11 | $52.20 | $824.00 | $1,165.79 | 7.7 kg |
+| Park at Hamilton | 7:30 → 8:36 | 5:55 PM, home 7:22 | $34.49 | $55.96 | $905.92 | $1,083.87 | 10.8 kg |
+| Park at Secaucus | 8:37 → 8:49 | 5:55 PM, home 7:18 | $53.04 | $75.42 | $1,512.83 | $476.96 | 18.2 kg |
+| Drive all the way *(Fastest)* | — | leave 5:30, home 6:47 | **$76.17** | **$95.51** | $1,989.79 | — | 18.7 kg |
+
+CO₂ (all *estimated*): drive miles ÷ 25.5 mpg × 8.887 kg/gal, plus train miles (from the GTFS
+shape: Metropark 24.6 mi) × 0.133 kg per passenger-mile. No option gets *Fewest transfers*
+(all 0: a tie). Verified on Friday 10/16 with the dev server; same trains and prices.
 
 Door to door one-way: 115 / 113 / 113 / 126 / 82 min. Per year: Metropark $9,287.04 vs driving
 $23,877.48, so it saves **$14,590.44 a year**.
@@ -200,6 +221,17 @@ Javits has no sourced garage price, so driving's total excludes parking and rank
 complete totals. Secaucus's trip home crosses a Turnpike pair that isn't in the toll data
 (15X → 14-14C), so its day and month show unknown.
 
+**E. Filters and your car (Scenario A, D-21).**
+- **Avoid tolls:** Metropark, Princeton Jct. and Hamilton remain. *Hidden by your filters (2)*:
+  Drive all the way (Turnpike 9→16E $10.29 + Lincoln Tunnel $16.79 = $27.08; congestion toll
+  $6.00; trip home Turnpike 16E→9 $10.29) and Secaucus (trip home Turnpike 15X→9 $9.42). The
+  free routing server offered no toll-free alternative for either.
+- **Longest walk 8 min:** only Drive all the way remains; every park-and-ride is hidden with
+  "Walks 24 min on the morning trip; your limit is 8 min" (7 min park-and-walk + 17 min to
+  Times Square).
+- **32 mpg:** gas reads "… at 32 mpg (your value)" and is labeled *user reported*; Metropark
+  one-way drops to $26.68 and its CO₂ to 10.7 kg.
+
 Bryant Park and Times Square give the same costs; only the final walk differs. Ranking uses the
 morning trip, and in all three scenarios the daily totals rank the options in the same order.
 
@@ -215,7 +247,9 @@ cache) and a `TransitProvider` (tonight a reader that pulls next-train answers s
 TRANSIT's official GTFS timetable). A pure-Python **cost engine** prices each option from
 **effective-dated data files** (`data/fares`, `data/tolls`, `data/parking`, `data/vehicle`), each
 recording its source URL and retrieval date, with no prices written into code. The engine then
-ranks the options and writes the labels and the one-line explanation. Switching to production
+ranks the options, awards badges (unique winners only), applies the filters (listing what they
+hide and why), estimates CO₂ from EPA factors in `data/emissions`, and writes the one-line
+explanation. Switching to production
 means swapping in Mapbox and OpenTripPlanner adapters; the cost engine and the page don't change.
 
 The plain-words box uses the same rule. `POST /api/v1/trip/ai-parse` sends the sentence to an
@@ -228,7 +262,7 @@ and waits for the user to confirm.
 
 ```
 Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
-                                               ├─ TripSearchService (rank, label, explain)
+                                               ├─ TripSearchService (filter, rank, badge, explain)
                                                ├─ cost engine ◀── data/*.yaml (sourced, dated)
                                                ├─ DrivingProvider ── OSRM (→ Mapbox later)
                                                └─ TransitProvider ── NJT GTFS (→ OTP later)
@@ -251,6 +285,10 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 | Midtown garage ($33.92) | Human-entered SpotHero quote (overnight window) | estimated |
 | Gas $4.347/gal | EIA weekly, Central Atlantic | estimated |
 | 25.5 mpg | EPA Trends 2024 (27.2 minus 1.7 for EVs) | estimated |
+| CO₂ 8.887 kg per gallon of gasoline | EPA "Greenhouse Gas Emissions from a Typical Passenger Vehicle" | estimated |
+| CO₂ 0.133 kg / passenger-mile (commuter rail), 0.093 (subway) | EPA GHG Emission Factors Hub 2025, Table 10 (US averages) | estimated |
+| Your mpg / gas price (Settings) | What you typed | user reported |
+| Google / Apple Maps links | URL templates in `data/regions/nyc-metro.yaml` | — |
 | Drive times | OSRM / OpenStreetMap, free-flow | estimated |
 | 250 working days a year (20.8 a month) | OPM 2026 federal holidays: 261 weekdays − 11 holidays | estimated |
 | Head home at 5:30 PM | Corridor data file (a default the user can change) | — |
@@ -292,6 +330,18 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 - **Javits Center facts that are unknown:** no sourced parking rate nearby, so driving's parking
   shows *unknown*. Its location inside the congestion zone was human-confirmed.
 - "Arrive by …" in plain words is recognized but not planned. The page asks for a leave time.
+- **Avoid tolls can only hide, not reroute, in most cases.** The free routing server refuses
+  "exclude tolls", so the server prices the alternative routes it offers and uses a $0 one when
+  there is one; otherwise the option is hidden with its tolls listed. Every Hudson crossing
+  into Manhattan is tolled, so driving all the way is always hidden. Mapbox's exclude-toll
+  routing is the production plan.
+- **CO₂ is tailpipe CO₂ only**, from US national-average factors (not NJ TRANSIT's or MTA's own
+  figures), and does not count upstream fuel or power-plant emissions. **Not yet
+  human-spot-checked.**
+- The **longest walk** filter counts the 7-minute park-and-walk allowance plus the walk at the
+  city end of the morning trip.
+- **Map-app links** hand the drive to Google or Apple Maps; their route and timing can differ
+  from ours (they may pick a different toll road).
 - Voice is dictation into the text box (Handy, a separate app), not a feature of WayBetter.
   Misheard place names aren't corrected by the app; an unknown town is reported as not found
   with a question, never matched to a "close" town.
@@ -327,9 +377,9 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   place name it doesn't know goes to OpenStreetMap's address lookup), and if it's down a rules
   parser takes over. The production
   plan (D-10) swaps in a cloud model behind the same interface.
-- **"What did you test?"** 255 automated tests (cost math, toll detection in both directions,
-  once-a-day charges, monthly-pass math, ranking, unknown handling, session tokens, API
-  contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
+- **"What did you test?"** 297 automated tests (cost math, toll detection in both directions,
+  once-a-day charges, monthly-pass math, every sort, filter and badge tie rule, CO₂, unknown
+  handling, session tokens, API contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
   network access blocked.
 - **"How do you get the monthly savings?"** Daily cost × 20.8 working days, where 20.8 comes
   from the federal holiday calendar and is labeled *estimated*. For rail, the system compares a
@@ -337,5 +387,6 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   unknown, the monthly figure and the savings show *unknown* too, so a partial sum never poses
   as a total.
 - **"Why did the API version change?"** Adding the trip home added a request field and a
-  response field, so the API contract went from 0.1.0 to 0.2.0. A test fails the build if the
+  response field, so the API contract went from 0.1.0 to 0.2.0; it is now 0.8.0 (badges
+  replaced the single label, plus CO₂, filters and map links). A test fails the build if the
   code and the contract disagree.
