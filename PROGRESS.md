@@ -160,6 +160,36 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT extension, plain-words box on the demo page):** Fast-forwarded
+  `main` to `demo/nl-parse` (it already contained main's page round 4; the redesign chat was idle with
+  its work committed). The `#ask` slot on the page is now a text box ("Or say it in plain words",
+  Enter or **Read it**) that posts `{text}` to `POST /api/v1/trip/ai-parse` with `X-Session-Token`
+  (401 → new session, retried once, same as search). It renders the response as "Here's what I
+  understood": one row per `interpretation` item with `value_label` in the page's status type
+  (dashed = ai_generated, dotted = estimated, red = unknown), the status word, a **default** marker
+  when `is_default`, then `clarifying_question`, `missing_fields` and `parser` / `parser_note`. Place
+  notes (how the place was found plus the ODbL attribution) stay on screen; the other notes ("Default:
+  …", "Read from your words") are in the row tooltip, to keep the results near the top. When
+  `missing_fields` is empty the page copies `draft` into the form (a place goes to the preset with the
+  same coordinates, otherwise it's added to the list as the server labelled it; `target_time` to Leave
+  at; `return_time` (or the corridor default the interpretation reports) and `toll_payment` to the
+  Home / Tolls chips for this page view only, not saved; `sort_mode` to the rank tab) and runs the
+  normal search. Otherwise it shows the question and leaves the form alone. No parsing, defaults or
+  place logic in the page (N-01). **Also changed:** a row's single tag is now the server label that
+  matches the active rank tab when the row has one (else its first label, as before), so under
+  Cheapest Metropark shows "Cheapest" instead of "Best overall"; the tag is green for the active
+  tab's winner. **Verified** on port 8020 (new `waybetter-api-dev` entry in `.claude/launch.json`):
+  the DeLucia's sentence → Ollama qwen3:8b → origin Raritan (town center), approximate, with the
+  question; destination Javits; leave 7:00 AM (default); Cheapest tab, row 1 **Metropark, tag
+  Cheapest, $29.40**, Drive all the way $30.55 with parking unknown. At 375 px: no horizontal scroll;
+  "from somewhere to the office tomorrow at 8" shows From/To unknown, the question and "Needs: From,
+  To", and the form stays untouched. No console errors. `make check` green: ruff, mypy, pytest 220
+  (`test_natural_language_slot_is_reserved` replaced by `test_plain_words_box_posts_to_ai_parse`;
+  the placeholder avoids the sort-mode words the no-hard-coded-sorts test forbids).
+  Files: `backend/app/web/index.html`, `backend/tests/test_web_page.py`, `.claude/launch.json`.
+  Requirements: F-08, F-18, N-01, N-02. **Surprise:** after a plain-words search the results are
+  below the understood box and the form, so on a laptop screen the presenter scrolls down to see them.
+
 - **2026-10-14 — Claude (DEMO SPRINT extension, branch `demo/nl-parse` — human-approved items 1, 12, 13, 14, 23):**
   Plain-words trip requests. **Status: all 5 steps done**; branch pushed, not merged (a later chat merges).
   (1) Startup preload: the trip service (GTFS load) plus one preset warm-up search run on a daemon
