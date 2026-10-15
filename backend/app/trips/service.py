@@ -68,6 +68,12 @@ BADGE_TEXT: dict[BadgeId, str] = {
 """Most driving is a sort tab only: driving the most is not something to award."""
 
 
+NO_TRIP_HOME = (
+    "No trip home planned: the head-home time is not after this departure, so daily, monthly "
+    "and yearly costs are unknown."
+)
+
+
 class TripSearchError(ValueError):
     """The request cannot be served (outside the region, unsupported mode)."""
 
@@ -283,6 +289,12 @@ class TripSearchService:
 
         options: list[_Option] = []
         warnings_global: list[str] = []
+        if return_at is None:
+            warnings_global.append(
+                f"The head-home time ({_clock(self._home_time(depart, request.return_time))}) "
+                f"is not after the {_clock(depart)} departure, so only the one-way trip is "
+                "planned. Set a later head-home time to see daily, monthly and yearly costs."
+            )
         try:
             options.append(
                 self._drive_all_the_way(origin, destination, dest_place, depart, return_at, ctx)
@@ -313,15 +325,16 @@ class TripSearchService:
             disclaimers=self._disclaimers() + warnings_global,
         )
 
-    def _return_at(self, depart: datetime, requested: str | None) -> datetime:
+    def _home_time(self, depart: datetime, requested: str | None) -> datetime:
         hhmm = requested or self._corridor.commute.default_return_time
         hour, minute = (int(part) for part in hhmm.split(":"))
-        at = depart.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if at <= depart:
-            raise TripSearchError(
-                "The head-home time must be later the same day than the departure"
-            )
-        return at
+        return depart.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    def _return_at(self, depart: datetime, requested: str | None) -> datetime | None:
+        """The head-home time on the departure's day, or None when it is not later than the
+        departure (an evening trip): the options are then planned one way only."""
+        at = self._home_time(depart, requested)
+        return at if at > depart else None
 
     # -- options -------------------------------------------------------------------
 
@@ -409,7 +422,7 @@ class TripSearchService:
         destination: LatLon,
         dest_place: Place | None,
         depart: datetime,
-        return_at: datetime,
+        return_at: datetime | None,
         ctx: _Context,
     ) -> _Option:
         chosen = self._drive(origin, destination, depart, ctx)
@@ -459,12 +472,15 @@ class TripSearchService:
             warnings.append(chosen.note)
         warnings.append("Drive time is free-flow (no live traffic); rush hour is usually slower.")
         round_trip = None
-        try:
-            evening = self._drive_home(origin, destination, max(return_at, arrive), ctx)
-            round_trip = self._round_trip(evening, breakdown, leg.duration_minutes, None)
-            warnings += evening.warnings
-        except ProviderError as exc:
-            warnings.append(f"Trip home unavailable: {exc}")
+        if return_at is None:
+            warnings.append(NO_TRIP_HOME)
+        else:
+            try:
+                evening = self._drive_home(origin, destination, max(return_at, arrive), ctx)
+                round_trip = self._round_trip(evening, breakdown, leg.duration_minutes, None)
+                warnings += evening.warnings
+            except ProviderError as exc:
+                warnings.append(f"Trip home unavailable: {exc}")
         option = RouteOption(
             route_id="drive",
             badges=[],
@@ -638,7 +654,7 @@ class TripSearchService:
         destination: LatLon,
         dest_place: Place | None,
         depart: datetime,
-        return_at: datetime,
+        return_at: datetime | None,
         ctx: _Context,
     ) -> _Option | None:
         station = self._stations.get(lot.station)
@@ -739,30 +755,33 @@ class TripSearchService:
         if lot.status is DataStatus.ESTIMATED:
             warnings.append(f"{lot.name} price is an estimate: {lot.source.notes or ''}".strip())
         round_trip = None
-        try:
-            evening = self._ride_home(
-                lot,
-                station,
-                hub,
-                origin,
-                destination,
-                max(return_at, last_leg.end_time),
-                at_lot,
-                parking,
-                ctx,
-            )
-            if evening is None:
-                warnings.append(
-                    f"No scheduled train from {hub.name.title()} to {station.name.title()} "
-                    "after the return time, so there is no daily round-trip figure."
+        if return_at is None:
+            warnings.append(NO_TRIP_HOME)
+        else:
+            try:
+                evening = self._ride_home(
+                    lot,
+                    station,
+                    hub,
+                    origin,
+                    destination,
+                    max(return_at, last_leg.end_time),
+                    at_lot,
+                    parking,
+                    ctx,
                 )
-            else:
-                round_trip = self._round_trip(
-                    evening, breakdown, total, self._rail_row(lot.station)
-                )
-                warnings += evening.warnings
-        except ProviderError as exc:
-            warnings.append(f"Trip home unavailable: {exc}")
+                if evening is None:
+                    warnings.append(
+                        f"No scheduled train from {hub.name.title()} to {station.name.title()} "
+                        "after the return time, so there is no daily round-trip figure."
+                    )
+                else:
+                    round_trip = self._round_trip(
+                        evening, breakdown, total, self._rail_row(lot.station)
+                    )
+                    warnings += evening.warnings
+            except ProviderError as exc:
+                warnings.append(f"Trip home unavailable: {exc}")
         option = RouteOption(
             route_id=f"pnr-{lot.lot_id}",
             badges=[],

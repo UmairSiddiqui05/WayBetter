@@ -289,9 +289,26 @@ def test_a_requested_return_time_overrides_the_default(service: TripSearchServic
         assert round_trip(r).return_legs[0].start_time.strftime("%H:%M") == "19:15"
 
 
-def test_return_before_departure_is_rejected(service: TripSearchService) -> None:
-    with pytest.raises(TripSearchError, match="head-home time"):
-        service.search(request(return_time="06:30"), NOW)
+def test_evening_departure_plans_one_way_and_says_why(service: TripSearchService) -> None:
+    # A head-home time that isn't after the departure (6:30 AM home, 7:00 AM out; or any trip
+    # leaving after the default 5:30 PM) used to be a 422. Now: one-way options, no round trip,
+    # daily/monthly/yearly left unknown, and the reason in the disclaimers and on each option.
+    response = service.search(request(return_time="06:30"), NOW)
+
+    assert response.routes, "one-way options are still planned"
+    for route in response.routes:
+        assert route.round_trip is None
+        assert route.cost_breakdown.total > 0
+        assert any("No trip home planned" in w for w in route.warnings)
+    assert any("head-home time (6:30 AM)" in d for d in response.disclaimers)
+
+
+def test_evening_departure_ranks_and_badges_on_the_one_way_trip(
+    service: TripSearchService,
+) -> None:
+    routes = service.search(request(return_time="06:30"), NOW).routes
+
+    assert sum(len(r.badges) for r in routes) > 0  # ranking does not need the trip home
 
 
 def test_drive_home_pays_the_turnpike_but_not_the_tunnel_or_a_second_congestion_toll(
