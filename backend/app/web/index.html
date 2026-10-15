@@ -102,19 +102,6 @@
   .pw { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; white-space: nowrap; }
   .pw.st-unknown { color: var(--bad); }
 
-  /* Time-vs-cost chart */
-  .chart { margin: 4px 0 6px; }
-  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .chart .axis { stroke: #cfd2d6; stroke-width: 1; }
-  .chart .tick { font-size: 10px; fill: var(--muted); }
-  .chart .corner { font-size: 10px; font-weight: 700; fill: var(--good); letter-spacing: .04em; text-transform: uppercase; }
-  .chart .dot { cursor: pointer; }
-  .chart .dot circle { stroke: #fff; stroke-width: 2; }
-  .chart .dot.sel circle { stroke: var(--ink); stroke-width: 2.5; }
-  .chart .dot text { font-size: 11px; font-weight: 650; fill: var(--ink-2); }
-  .chart .dot.sel text { fill: var(--ink); font-weight: 800; }
-  .chart .note { font-size: 11px; color: var(--muted); }
-
   /* Ranked rows */
   .rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
   .row { display: grid; gap: 7px; padding: 12px 10px 12px 12px; border-bottom: 1px solid var(--line);
@@ -221,6 +208,10 @@
   .nav[aria-current=page] { background: var(--soft); color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
 
   /* Map bits */
+  .basemap-switch { display: flex; padding: 2px; border-radius: 6px; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+  .basemap-switch button { padding: 5px 12px; border: 0; border-radius: 4px; background: none; font-size: 13px; font-weight: 650;
+    color: var(--muted); cursor: pointer; }
+  .basemap-switch button[aria-pressed=true] { background: var(--ink); color: #fff; }
   .legend { background: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.7; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
   .legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
   .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
@@ -288,7 +279,6 @@
           </div>
         </div>
         <div class="legend-line" id="prov-legend"></div>
-        <div class="chart" id="chart"></div>
       </div>
       <div id="status" role="status" aria-live="polite"></div>
       <ol class="rows" id="list" aria-label="Ranked options"></ol>
@@ -500,12 +490,26 @@ fetch("/static/basemap-ny-nj-ct.geojson").then((r) => r.json()).then((geo) => {
     style: { color: "#8a94a6", weight: 1, fillColor: "#f3efe6", fillOpacity: 1 } }).addTo(map);
   map.attributionControl.addAttribution("Outlines: Natural Earth");
 }).catch(() => {});
-const OFFLINE = PARAMS.has("offline");
-if (!OFFLINE) {
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
+// Map style: OpenStreetMap streets by default. "Simple" hides the tiles so only the bundled
+// outlines show (no network needed); ?offline opens on Simple.
+const streets = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18, attribution: "&copy; OpenStreetMap contributors",
+});
+const switcher = L.control({ position: "topright" });
+switcher.onAdd = () => {
+  const d = L.DomUtil.create("div", "basemap-switch");
+  d.setAttribute("role", "group"); d.setAttribute("aria-label", "Map style");
+  d.innerHTML = `<button type="button" data-basemap="street">Street</button><button type="button" data-basemap="simple">Simple</button>`;
+  L.DomEvent.disableClickPropagation(d);
+  d.addEventListener("click", (e) => { const b = e.target.closest("[data-basemap]"); if (b) setBasemap(b.dataset.basemap); });
+  return d;
+};
+switcher.addTo(map);
+function setBasemap(kind) {
+  if (kind === "street") streets.addTo(map); else streets.remove();
+  document.querySelectorAll("[data-basemap]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.basemap === kind)));
 }
+setBasemap(PARAMS.has("offline") ? "simple" : "street");
 const legend = L.control({ position: "bottomright" });
 legend.onAdd = () => {
   const d = L.DomUtil.create("div", "legend");
@@ -662,40 +666,6 @@ function renderRows() {
   }).join("");
 }
 
-// ---- Time-vs-cost chart: each option is a dot; bottom-left is faster and cheaper -------------
-function renderChart() {
-  const pts = current.map((r, idx) => ({ r, idx, f: figures(r)[period] })).filter((p) => p.f.amount !== null);
-  const missing = current.filter((r) => figures(r)[period].amount === null).map((r) => rowTitle(r));
-  if (pts.length < 2) { $("chart").innerHTML = ""; return; }
-  const W = 400, H = 180, L0 = 60, R0 = 120, T0 = 18, B0 = 28;
-  const xs = pts.map((p) => p.r.total_minutes), ys = pts.map((p) => p.f.amount);
-  const [x0, x1] = [Math.min(...xs), Math.max(...xs)], [y0, y1] = [Math.min(...ys), Math.max(...ys)];
-  const dx = (x1 - x0) * 0.08 || 5, dy = (y1 - y0) * 0.1 || 1;  // keep dots off the axes
-  const X = (v) => L0 + (v - x0 + dx) / (x1 - x0 + 2 * dx) * (W - L0 - R0);
-  const Y = (v) => H - B0 - (v - y0 + dy) / (y1 - y0 + 2 * dy) * (H - T0 - B0);
-  // Labels stack in a column on the right, each joined to its dot by a thin leader line.
-  const placed = pts.map((p) => ({ ...p, x: X(p.r.total_minutes), y: Y(p.f.amount) })).sort((a, b) => a.y - b.y);
-  placed.forEach((p, i) => { p.ly = Math.max(p.y, i ? placed[i - 1].ly + 14 : T0); });
-  for (let i = placed.length - 1, max = H - B0; i >= 0; i--) { placed[i].ly = Math.min(placed[i].ly, max); max = placed[i].ly - 14; }
-  const lx = W - R0 + 16, unit = figures(current[0])[period].unit;
-  $("chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Door-to-door minutes against cost ${esc(unit)} for each option">
-    <line class="axis" x1="${L0}" y1="${H - B0}" x2="${W - R0}" y2="${H - B0}"/><line class="axis" x1="${L0}" y1="${T0 - 6}" x2="${L0}" y2="${H - B0}"/>
-    <text class="tick" x="0" y="${T0 - 8}">Cost ${esc(unit)}</text>
-    <text class="tick" x="${L0 - 6}" y="${Y(y0) + 3}" text-anchor="end">${money(y0)}</text>
-    <text class="tick" x="${L0 - 6}" y="${Y(y1) + 3}" text-anchor="end">${money(y1)}</text>
-    <text class="tick" x="${X(x0)}" y="${H - B0 + 13}" text-anchor="middle">${mins(x0)}</text>
-    <text class="tick" x="${X(x1)}" y="${H - B0 + 13}" text-anchor="middle">${mins(x1)}</text>
-    <text class="tick" x="${W - R0}" y="${H - 2}" text-anchor="end">door to door →</text>
-    <text class="corner" x="${L0 + 6}" y="${H - B0 - 6}">faster &amp; cheaper</text>
-    ${placed.map((p) => `<g class="dot ${p.idx === selected ? "sel" : ""}" data-idx="${p.idx}">
-      <title>${esc(rowTitle(p.r))}: ${mins(p.r.total_minutes)}, ${money(p.f.amount)} ${esc(unit)} (${esc(provOf(p.f.prov).word)})</title>
-      <polyline points="${p.x + 7},${p.y} ${lx - 6},${p.ly}" fill="none" stroke="#cfd2d6" stroke-width="1"/>
-      <circle cx="${p.x}" cy="${p.y}" r="${p.idx === selected ? 7 : 6}" fill="${CSSV(railLeg(p.r) ? "--rail" : "--car")}"/>
-      <text x="${lx}" y="${p.ly + 4}">${esc(rowTitle(p.r))}</text></g>`).join("")}
-  </svg>${missing.length ? `<div class="note">Not plotted (cost unknown): ${missing.map(esc).join(", ")}</div>` : ""}`;
-}
-$("chart").addEventListener("click", (e) => { const g = e.target.closest(".dot"); if (g) openDetail(Number(g.dataset.idx)); });
-
 // ---- Detail ---------------------------------------------------------------------------------
 function stepTitle(leg) {
   const k = legKind(leg);
@@ -778,7 +748,6 @@ function openDetail(idx) {
 }
 function closeDetail() {
   $("detail").hidden = true; $("list").hidden = false; $("results-controls").hidden = !current.length; $("status").hidden = false;
-  renderChart();
   const row = $("list").querySelector(`[data-idx="${selected}"]`);
   if (row) row.focus();
 }
@@ -811,7 +780,7 @@ function setPeriod(p) {
 }
 $("period").addEventListener("click", (e) => {
   const b = e.target.closest("[data-period]");
-  if (b) { setPeriod(b.dataset.period); renderRows(); renderChart(); }
+  if (b) { setPeriod(b.dataset.period); renderRows(); }
 });
 
 // ---- Search ---------------------------------------------------------------------------------
@@ -846,7 +815,7 @@ async function search() {
     if (ticket !== inflight) return;
     lastQuery = { origin: body.origin, destination: body.destination };
     current = data.routes; selected = 0; sortOptions = data.sort_options || [];
-    renderSorts(); renderRows(); renderChart();
+    renderSorts(); renderRows();
     $("detail").hidden = true; $("list").hidden = false; $("status").hidden = false;
     $("results-controls").hidden = !current.length;
     if (!current.length) $("list").innerHTML = `<li class="hint">No options could be computed for this trip. See About and limitations.</li>`;
