@@ -161,7 +161,7 @@ The single source of truth for **what is done, what is in progress, and what com
 ## Work log (append-only, newest first)
 
 - **2026-10-14 — Claude (DEMO SPRINT extension, branch `demo/nl-parse` — human-approved items 1, 12, 13, 14, 23):**
-  Plain-words trip requests. **Status: steps 1–3 of 5 done** (updated as steps land).
+  Plain-words trip requests. **Status: steps 1–4 of 5 done** (updated as steps land).
   (1) Startup preload: the trip service (GTFS load) plus one preset warm-up search run on a daemon
   thread at startup, so `/healthz` answers at once (18 ms measured) and the first search is fast
   (9 ms vs 3.3 s cold, port 8010); skipped when `ENVIRONMENT=test` or the GTFS zip is missing.
@@ -188,6 +188,19 @@ The single source of truth for **what is done, what is in progress, and what com
   **Surprise (backlog):** with Javits parking unknown, the drive option's total excludes parking,
   so under `best_overall` "Drive all the way" can rank first (Princeton → Javits $42.01*, flagged
   "Some costs are unknown"). `cheapest` still ranks Metropark first for every Javits pair.
+  (4) Local model (**D-19**): `OllamaProvider` (`providers/ollama.py`, plain httpx to `/api/chat`)
+  with `format` = `ParsedTrip` JSON schema (extra=forbid), temperature 0, `think: false`, 20 s
+  timeout, `keep_alive` 30 m, `model_validate_json`. Ollama 0.40.4 via Homebrew (`brew services`),
+  model `qwen3:8b` (5.2 GB). Settings/.env/.env.example: `OLLAMA_BASE_URL`, `OLLAMA_MODEL` (empty =
+  rules only). Startup preload also warms the model. Measured on port 8010: 2.4–4.6 s per parse
+  warm (cold load ~5 s happens at startup); with Ollama stopped the endpoint answers in 50 ms via
+  rules, and `parser_note` says why. **Surprise:** even at temperature 0, qwen3:8b filled fields
+  nobody mentioned (toll "cash", priority "fastest") and read "home by 6:30" as arrive-by 18:30. So
+  the model's answer is now checked against the words by deterministic code
+  (`checked_against_words`): exact rules reads win; model-only values survive only with backing
+  words (place words present in the text, the hour typed, a toll/money/speed word present);
+  every override is listed in `parser_note`. Run the server from the repo root with
+  `--env-file .env` (settings read `.env` relative to the working directory).
   Files: `backend/app/parsing/*`, `backend/app/api/v1/trip.py`, `backend/app/trips/{factory,corridor}.py`,
   `backend/app/main.py`, `backend/app/providers/base.py`, `data/regions/nyc-metro-demo-corridor.yaml`,
   `docs/api-spec.yaml`, tests `test_preload.py`, `test_ai_parse.py`. Requirements: F-01, F-08, N-02, N-04, N-07.

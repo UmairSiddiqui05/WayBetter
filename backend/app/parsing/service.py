@@ -6,7 +6,9 @@ missing are decided here, by the same code whichever parser ran.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
+from difflib import SequenceMatcher
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -17,7 +19,7 @@ from app.parsing.models import (
     ParsedTrip,
     TripSearchDraft,
 )
-from app.parsing.places import PlaceResolver
+from app.parsing.places import PlaceResolver, normalize
 from app.providers.base import LLMProvider, ProviderError
 from app.trips.corridor import Corridor
 from app.trips.models import Preferences, Provenance, VehicleProfile
@@ -41,6 +43,88 @@ def clock(hhmm: str) -> str:
 
 def _leave_label(at: datetime, hhmm: str) -> str:
     return f"Leave {at:%a %b} {at.day}, {clock(hhmm)}"
+
+
+_EVIDENCE = {
+    "priority": re.compile(
+        r"cheap|money|cost|price|budget|afford|spend|sav(?:e|ing)|expens|fast|quick|hurry"
+        r"|soon|rush|short|time",
+        re.IGNORECASE,
+    ),
+    "toll_payment": re.compile(r"cash|e[\s-]?z[\s-]?pass|toll|transponder", re.IGNORECASE),
+}
+_TIME_FIELDS = ("leave_time", "arrive_by_time", "home_time")
+_LABELS = {
+    "origin_text": "start",
+    "destination_text": "destination",
+    "priority": "priority",
+    "toll_payment": "toll payment",
+    "leave_time": "leave time",
+    "arrive_by_time": "arrive-by time",
+    "home_time": "head-home time",
+}
+
+
+def _said(words: str, text_words: list[str]) -> bool:
+    """Every word of a place the model returned appears in the text (a small typo allowed)."""
+    return all(
+        any(w == t or SequenceMatcher(None, w, t).ratio() >= 0.8 for t in text_words)
+        for w in normalize(words).split()
+    )
+
+
+def _hour_said(hhmm: str, text: str) -> bool:
+    hour = int(hhmm[:2])
+    said = {int(n) for n in re.findall(r"(?<![\d:])(\d{1,2})(?=\D|$)", text)}
+    if re.search(r"\bnoon\b", text, re.IGNORECASE):
+        said.add(12)
+    return hour in said or (hour % 12 or 12) in said
+
+
+def checked_against_words(
+    model: ParsedTrip, rules: ParsedTrip, text: str
+) -> tuple[ParsedTrip, list[str]]:
+    """The model proposes; deterministic checks decide (D-11 hallucination guard).
+
+    A value the rules parser read exactly wins. A value only the model found is kept when
+    the user's words back it up — the place's words appear in the text, the hour is a number
+    the user typed, a toll or money/speed word is present — and dropped otherwise.
+    Returns the merged result and a plain-words list of what was changed.
+    """
+    text_words = normalize(text).split()
+    merged: dict[str, object] = {}
+    changes: list[str] = []
+
+    def take(field: str, rules_value: object, model_value: object, backed: bool) -> None:
+        if rules_value is not None:
+            merged[field] = rules_value
+            if model_value is not None and model_value != rules_value:
+                changes.append(f"used the {_LABELS[field]} read exactly from your text")
+        elif model_value is not None and backed:
+            merged[field] = model_value
+        else:
+            merged[field] = None
+            if model_value is not None:
+                changes.append(f"dropped the {_LABELS[field]} you didn't mention")
+
+    for field in ("origin_text", "destination_text"):
+        value = getattr(model, field)
+        take(field, getattr(rules, field), value, bool(value) and _said(value, text_words))
+    for field in ("priority", "toll_payment"):
+        take(
+            field, getattr(rules, field), getattr(model, field), bool(_EVIDENCE[field].search(text))
+        )
+    if any(getattr(rules, f) for f in _TIME_FIELDS):
+        # Times are where small models slip (home vs arrive-by); exact rules reads win outright.
+        for field in _TIME_FIELDS:
+            take(field, getattr(rules, field), getattr(model, field), False)
+            if getattr(rules, field) is None and getattr(model, field) is not None:
+                changes[-1] = f"dropped the {_LABELS[field]} that conflicts with your times"
+    else:
+        for field in _TIME_FIELDS:
+            value = getattr(model, field)
+            take(field, None, value, bool(value) and _hour_said(value, text))
+    return ParsedTrip.model_validate(merged), changes
 
 
 def _minutes(hhmm: str) -> int:
@@ -72,8 +156,22 @@ class TripParseService:
             log.warning("trip_parser_fallback", parser=self._parser.name, error=str(exc))
             parsed = self._fallback.parse_trip(text)
             used = self._fallback.name
-            parser_note = f"{self._parser.name} unavailable ({exc}); used the {used} parser"
+            parser_note = f"{self._parser.name} unavailable: {exc}. Used the {used} parser"
+        else:
+            if used != self._fallback.name:
+                parsed, changes = checked_against_words(
+                    parsed, self._fallback.parse_trip(text), text
+                )
+                if changes:
+                    parser_note = "Checked the model against your words: " + "; ".join(changes)
         return self.interpret(parsed, now, parser=used, parser_note=parser_note)
+
+    def warm_up(self) -> None:
+        """Load the model into memory before the first real request (a cold load is ~5 s)."""
+        try:
+            self._parser.parse_trip("from Princeton to Times Square")
+        except ProviderError as exc:
+            log.info("trip_parser_warm_up_failed", parser=self._parser.name, error=str(exc))
 
     def _depart_date(self, hhmm: str, now: datetime) -> datetime:
         """Today if that time is still ahead on a weekday, otherwise the next weekday."""

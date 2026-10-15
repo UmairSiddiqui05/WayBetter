@@ -69,8 +69,18 @@ def test_preload_runs_the_build_on_a_background_thread(
     built: list[str] = []
     monkeypatch.setattr(factory, "get_trip_service", lambda: built.append("x"))
 
+    monkeypatch.setattr(factory, "_warm_up", lambda _service: built.append("search"))
+
+    class _Parser:
+        def warm_up(self) -> None:
+            built.append("model")
+
+    from app.parsing import factory as parse_factory
+
+    monkeypatch.setattr(parse_factory, "get_parse_service", lambda: _Parser())
+
     thread = factory.preload_in_background()
 
     assert thread is not None and thread.daemon
     thread.join(timeout=5)
-    assert built == ["x"]
+    assert built == ["x", "search", "model"]

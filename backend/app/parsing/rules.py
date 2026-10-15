@@ -36,6 +36,9 @@ _STOP = (
 )
 _FROM_TO = re.compile(r"\bfrom\s+(?P<o>.+?)\s+to\s+(?P<d>.+?)" + _STOP, re.IGNORECASE)
 _TO_FROM = re.compile(r"\bto\s+(?P<d>.+?)\s+from\s+(?P<o>.+?)" + _STOP, re.IGNORECASE)
+# "Princeton to Bryant Park, leaving 7:15" — only when the text opens with the place.
+_BARE_TO = re.compile(r"^\s*(?P<o>[^,]+?)\s+to\s+(?P<d>.+?)" + _STOP, re.IGNORECASE)
+_NOT_A_PLACE = re.compile(r"^(?:i|we|my|me|how|what|can|could|want|need|get|going)\b", re.I)
 
 _CHEAP = re.compile(
     r"\bcheap(?:est|ly|er)?\b|\bsav(?:e|ing)\s+(?:some\s+)?money\b|\bleast\s+expensive\b"
@@ -92,7 +95,10 @@ class RulesParser:
             leave_time = _hhmm(leave, no_meridiem_pm_below=5)  # "leave at 7" = 7 AM
 
         origin = destination = None
-        if places := _FROM_TO.search(text) or _TO_FROM.search(text):
+        places = _FROM_TO.search(text) or _TO_FROM.search(text)
+        if not places and (bare := _BARE_TO.search(text)) and not _NOT_A_PLACE.match(bare["o"]):
+            places = bare
+        if places:
             origin, destination = _clean_place(places["o"]), _clean_place(places["d"])
 
         priority: Literal["cheapest", "fastest"] | None = None

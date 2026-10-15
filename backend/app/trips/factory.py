@@ -56,6 +56,14 @@ def preload_in_background() -> threading.Thread | None:
             log.info("trip_service_preloaded")
         except Exception as exc:  # the first request retries and reports the real error
             log.warning("trip_service_preload_failed", error=repr(exc))
+        # Local import: app.parsing depends on app.trips, not the other way round.
+        from app.parsing.factory import get_parse_service
+
+        try:
+            get_parse_service().warm_up()  # load the local model into memory
+            log.info("trip_parser_preloaded")
+        except Exception as exc:
+            log.warning("trip_parser_preload_failed", error=repr(exc))
 
     thread = threading.Thread(target=_run, name="trip-service-preload", daemon=True)
     thread.start()

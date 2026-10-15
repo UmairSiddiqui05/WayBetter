@@ -108,6 +108,20 @@ def test_rules_parser_toll_payment(text: str, toll: str | None) -> None:
     assert RulesParser().parse_trip(text).toll_payment == toll
 
 
+@pytest.mark.parametrize(
+    ("text", "origin", "destination"),
+    [
+        ("Princeton to Bryant Park, leaving 7:15", "Princeton", "Bryant Park"),
+        ("get me to times square from plainsboro", "plainsboro", "times square"),
+        ("I need to get to Times Square", None, None),
+    ],
+)
+def test_rules_parser_place_forms(text: str, origin: str | None, destination: str | None) -> None:
+    parsed = RulesParser().parse_trip(text)
+
+    assert (parsed.origin_text, parsed.destination_text) == (origin, destination)
+
+
 def test_parsed_trip_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         ParsedTrip.model_validate({"origin_text": "Princeton", "price": 12.5})

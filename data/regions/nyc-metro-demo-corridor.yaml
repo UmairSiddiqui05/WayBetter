@@ -49,6 +49,7 @@ destinations:
     lng: -73.9855
     in_congestion_relief_zone: true   # W 46th St, south of 60th St
     parking_area: midtown-manhattan
+    aliases: [times sq, 1540 broadway]
   - id: bryant-park
     label: "Bryant Park (6th Ave & W 42nd St)"
     lat: 40.7540

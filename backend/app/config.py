@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     mapbox_public_token: str = ""
     maptiler_api_key: SecretStr = SecretStr("")
     gemini_api_key: SecretStr = SecretStr("")
+    # Local LLM for plain-words trip parsing (D-19). Empty model = rules parser only.
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = ""
 
     # --- Transit agency feeds ---
     njt_developer_username: str = ""
