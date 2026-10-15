@@ -84,6 +84,24 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Backlog / discovered
 
+- **Evening departures fail (found 2026-10-15, audit):** any `leave_at` later than the head-home
+  time (corridor default 17:30) returns 422 "The head-home time must be later the same day than
+  the departure", even when the user never set a home time (6:00 PM fails; Saturday 7:00 AM and
+  23:30 with home 23:59 work). Plan one way with `round_trip: null` and say why instead
+  (`round_trip` is already nullable in the contract). `TripSearchService._return_at`.
+- **Page bugs (found 2026-10-15, audit):** Settings number inputs are right-aligned (the row
+  figures' `.num` rule also matches `input.num`); the remembered panel width is overwritten in
+  memory by the clamped value when the page loads in a narrow window (620 px saved, 320 px shown
+  in a 1,425 px window); server notes with "->" wrap between "-" and ">" (`overflow-wrap:
+  anywhere`); a failed search leaves the old results on screen; axe-core (WCAG 2.1 AA) reports the
+  train-station marker without an accessible name and `li role="button"` inside `ol`.
+- **README is stale (found 2026-10-15):** the public repo's README says "Status: planning
+  complete, pre-build" and describes OTP/Mapbox/Gemini as the running stack. Describe the working
+  demo, with screenshots and run steps. DEMO.md's header also says "after the interview".
+- **Route-card redesign proposal (audit 2026-10-15):** "Wayfinding" theme, compact cards with a
+  line diagram, expand-in-place, Cards/Table switch, filter chips, detail savings banner, parking
+  card (F-10). Prototyped outside the repo; see the 2026-10-15 audit work-log entry. Awaits the
+  human's approval (would be D-22).
 - **Toll-free routing for avoid_tolls (D-21, found 2026-10-15):** the public OSRM server answers
   `exclude=toll` with "Exclude flag combination is not supported", so the filter prices OSRM's
   alternatives with our toll files and hides the option when none is $0. Mapbox Directions
@@ -186,6 +204,23 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-15 — Claude (audit, human request; no code changed):** Full UI/UX and functionality
+  audit of the demo page and API for the Deloitte GPS interview, published as a private artifact
+  (https://claude.ai/artifact/8T77yQ11VsS5UqnvNAAewH) with before/after screenshots, findings, and a
+  time-boxed plan. Main findings: each option row stacks eight bands (≈270 px, five options
+  1,340 px; first option cut off at 1440×900); 10–11 dotted-underlined numbers per row; 3 of 7
+  ranking tabs off-screen; the detail prints "estimated" 17 times and puts the yearly savings
+  last; evening departures fail with 422; README still says pre-build (all in the backlog above).
+  **Prototype** of a "Wayfinding" theme (line stripe, rank bullets, tinted badges with icons, trip
+  as a line diagram, "≈" for estimated instead of dotted underlines, expand-in-place cards,
+  Cards/Table switch, filter chips, detail savings banner, parking card from data the API already
+  sends) built as a stylesheet + renderer injected into the running page with headless Chrome —
+  **not in the repo**; its source is attached to the artifact (`proto/wayfinding.{css,js}`,
+  `proto/wayfinding-sprite.js`, Lucide 1.48.0 icons). Checked: 298 tests, ruff, mypy green on
+  `0206176`; axe-core 4.10 WCAG 2.1 AA: 2 serious issues today, no contrast issues with the
+  prototype palette (lowest text pair 4.96:1); warm search 10–20 ms. Not verified: the prototype
+  against the page tests. Files: `PROGRESS.md`. Requirements: F-05, F-10, F-18, N-01, N-02, N-03.
 
 - **2026-10-15 — Claude (page, human request):** The boundary between the trip panel and the map
   can be dragged (desktop layout). An 8 px handle with a grip sits between them; it has
