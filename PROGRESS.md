@@ -158,6 +158,15 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT, page round 4 — human feedback):** A Street / Simple switch on
+  the map (top right) replaces needing a second tab for the plain basemap: Street (OpenStreetMap
+  tiles) is always the default; Simple removes the tiles so only the bundled Natural Earth outlines
+  show; `?offline` opens on Simple. The time-vs-cost chart from round 3 is removed: the human found
+  it packed and unintuitive, and each row's time bar and cost bar (same scale across rows) already
+  make that comparison. Verified: default Street with tiles, Simple shows none, numbers unchanged,
+  375 px no sideways scroll, network-blocked server opens on Simple with no outside requests, no
+  console errors. `make check` green (128). Files: `backend/app/web/index.html`. Requirement: F-18.
+
 - **2026-10-14 — Claude (DEMO SPRINT, page redesign round 3 — "less generic", human-approved):**
   Page only (`backend/app/web/index.html`); no API change. (1) Data status is carried by each
   number's own type instead of an icon after every number: plain = scheduled/live, dotted
