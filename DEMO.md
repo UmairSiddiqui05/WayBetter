@@ -144,6 +144,8 @@ hard-coded (an unconfirmed business falls back to the town it's in).
    uses the Turnpike."* Open the menu → **Compare options**: every option in one table. In
    any option's detail, the drive step has **Open in Google Maps / Apple Maps**. Untick Avoid
    tolls afterwards.
+   Tip: drag the thin bar between the list and the map to give either more room (double-click
+   it to reset); the page remembers the width.
 
 **Scenario B: Lawrenceville → Bryant Park.** *"Lawrenceville is next to Hamilton station, but
 Hamilton isn't the cheapest choice: its fare is $19.75 and parking is $13, against $13.05 and
@@ -377,7 +379,7 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   place name it doesn't know goes to OpenStreetMap's address lookup), and if it's down a rules
   parser takes over. The production
   plan (D-10) swaps in a cloud model behind the same interface.
-- **"What did you test?"** 297 automated tests (cost math, toll detection in both directions,
+- **"What did you test?"** 298 automated tests (cost math, toll detection in both directions,
   once-a-day charges, monthly-pass math, every sort, filter and badge tie rule, CO₂, unknown
   handling, session tokens, API contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
   network access blocked.

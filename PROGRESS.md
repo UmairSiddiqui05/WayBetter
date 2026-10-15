@@ -187,6 +187,20 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-15 — Claude (page, human request):** The boundary between the trip panel and the map
+  can be dragged (desktop layout). An 8 px handle with a grip sits between them; it has
+  `role="separator"` and is keyboard-operable (←/→ 24 px, Home = narrowest, End = widest, Enter
+  or double-click = back to the default). The panel stays ≥ 320 px and the map ≥ 280 px. The
+  Plan view (default 440 px) and the wider Compare view each remember their own width in this
+  browser (`localStorage` `waybetter.panel.v1`, a convenience: blocked storage just means the
+  default). The map is not clickable while dragging, so a drag never pans it. Hidden on phones
+  (stacked layout unchanged). **Verified** in the browser: mouse drag 440 → 698 px, keys,
+  limits (fixed: the right limit ignored the scrollbar, leaving the map 265 px), reload
+  restores the width, separate Compare width, double-click reset, 375 px layout, no console
+  errors. Renderer only (N-01); no API change. Test: `test_panel_and_map_share_a_draggable_…`
+  (298 total). Files: `backend/app/web/index.html`, `backend/tests/test_web_page.py`, `DEMO.md`,
+  `PROGRESS.md`. Requirements: F-18.
+
 - **2026-10-15 — Claude (post-sprint batch, D-21 — human-approved items 17, 18, 19, 21, 35, 11):**
   (0) **Demo sprint CLOSED** (human confirmed): DEMO-SPRINT.md status CLOSED, CLAUDE.md override
   block replaced by a closed note, D-21 logged (amends D-14: `cleanest` is an 8th UI sort).

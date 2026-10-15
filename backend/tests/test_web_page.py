@@ -142,3 +142,10 @@ def test_hidden_options_compare_view_and_map_links_render_from_the_response() ->
     assert 'data-view="compare"' in PAGE and "function renderCompare" in PAGE
     assert "leg.map_links" in PAGE and 'rel="noopener noreferrer"' in PAGE
     assert "r.emissions_kg" in PAGE
+
+
+def test_panel_and_map_share_a_draggable_keyboard_accessible_boundary() -> None:
+    assert 'id="splitter" role="separator"' in PAGE and 'aria-orientation="vertical"' in PAGE
+    assert 'tabindex="0"' in PAGE  # arrow keys resize too, not only the mouse
+    assert "var(--panel-w, 440px)" in PAGE  # the default width when nothing was dragged
+    assert ".splitter { display: none; }" in PAGE  # the phone layout stacks instead
