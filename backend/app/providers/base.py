@@ -77,3 +77,29 @@ class LLMProvider(Protocol):
     name: str
 
     def parse_trip(self, text: str) -> ParsedTrip: ...
+
+
+@dataclass(frozen=True, slots=True)
+class GeocodeResult:
+    name: str
+    """The feature's own name ("DeLucia's Brick Oven Pizza"), or "<number> <street>" for an
+    address with no name."""
+    town: str | None
+    """Town / city / village / borough from the address, when the geocoder knows it."""
+    display_name: str
+    point: LatLon
+    kind: str
+    """Geocoder category, e.g. "amenity", "place", "boundary", "building"."""
+    address_line: str | None = None
+    """"<number> <street>" when known ("429 11th Avenue"), even for a named feature."""
+    localities: tuple[str, ...] = ()
+    """Every place name in the address (town, city, borough, suburb...): "Manhattan" and
+    "New York" both describe 429 11th Ave."""
+
+
+class GeocodingProvider(Protocol):
+    attribution: str
+
+    def search(self, query: str) -> list[GeocodeResult]:
+        """Candidates for free text, inside the region. Raises ProviderError if unreachable."""
+        ...

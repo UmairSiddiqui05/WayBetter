@@ -38,6 +38,15 @@ _FROM_TO = re.compile(r"\bfrom\s+(?P<o>.+?)\s+to\s+(?P<d>.+?)" + _STOP, re.IGNOR
 _TO_FROM = re.compile(r"\bto\s+(?P<d>.+?)\s+from\s+(?P<o>.+?)" + _STOP, re.IGNORECASE)
 # "Princeton to Bryant Park, leaving 7:15" — only when the text opens with the place.
 _BARE_TO = re.compile(r"^\s*(?P<o>[^,]+?)\s+to\s+(?P<d>.+?)" + _STOP, re.IGNORECASE)
+# "... to 429 11th Ave, Manhattan": a short ", <Town>" right after the last place belongs to it,
+# unless it opens with a cue word ("and", "leaving", "cheapest", "please", ...).
+_TRAILING_TOWN = re.compile(r"^,\s*(?P<t>[A-Za-z][A-Za-z .'-]{1,40}?)" + _STOP, re.IGNORECASE)
+_CUE = re.compile(
+    r"^(?:and|but|so|i|we|my|leav|depart|head|home|arriv|get|be|cheap|fast|quick|save|what|how"
+    r"|please|thanks|thank|by|at|around|before|after|with|using|tomorrow|today|tonight|no|cash"
+    r"|e[\s-]?z)",
+    re.IGNORECASE,
+)
 _NOT_A_PLACE = re.compile(r"^(?:i|we|my|me|how|what|can|could|want|need|get|going)\b", re.I)
 
 _CHEAP = re.compile(
@@ -100,6 +109,11 @@ class RulesParser:
             places = bare
         if places:
             origin, destination = _clean_place(places["o"]), _clean_place(places["d"])
+            tail = _TRAILING_TOWN.match(text[places.end() :])
+            if tail and not _CUE.match(tail["t"]):
+                last = "o" if places.start("o") > places.start("d") else "d"
+                joined = _clean_place(f"{places[last]}, {tail['t']}")
+                origin, destination = (joined, destination) if last == "o" else (origin, joined)
 
         priority: Literal["cheapest", "fastest"] | None = None
         cheap, fast = _CHEAP.search(text), _FAST.search(text)

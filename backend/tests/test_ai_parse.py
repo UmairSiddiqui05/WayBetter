@@ -114,6 +114,9 @@ def test_rules_parser_toll_payment(text: str, toll: str | None) -> None:
         ("Princeton to Bryant Park, leaving 7:15", "Princeton", "Bryant Park"),
         ("get me to times square from plainsboro", "plainsboro", "times square"),
         ("I need to get to Times Square", None, None),
+        ("from Princeton to 429 11th Ave, Manhattan", "Princeton", "429 11th Ave, Manhattan"),
+        ("from Princeton to Times Square, leaving at 7", "Princeton", "Times Square"),
+        ("to Bryant Park from 3 1st Ave, Raritan", "3 1st Ave, Raritan", "Bryant Park"),
     ],
 )
 def test_rules_parser_place_forms(text: str, origin: str | None, destination: str | None) -> None:

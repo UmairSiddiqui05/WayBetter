@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # Local LLM for plain-words trip parsing (D-19). Empty model = rules parser only.
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = ""
+    # Address lookup (OpenStreetMap Nominatim; usage policy needs an identifying User-Agent).
+    # Empty = verified corridor places only.
+    nominatim_user_agent: str = ""
 
     # --- Transit agency feeds ---
     njt_developer_username: str = ""

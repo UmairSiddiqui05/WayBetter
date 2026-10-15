@@ -161,7 +161,7 @@ The single source of truth for **what is done, what is in progress, and what com
 ## Work log (append-only, newest first)
 
 - **2026-10-14 — Claude (DEMO SPRINT extension, branch `demo/nl-parse` — human-approved items 1, 12, 13, 14, 23):**
-  Plain-words trip requests. **Status: steps 1–4 of 5 done** (updated as steps land).
+  Plain-words trip requests. **Status: all 5 steps done**; branch pushed, not merged (a later chat merges).
   (1) Startup preload: the trip service (GTFS load) plus one preset warm-up search run on a daemon
   thread at startup, so `/healthz` answers at once (18 ms measured) and the first search is fast
   (9 ms vs 3.3 s cold, port 8010); skipped when `ENVIRONMENT=test` or the GTFS zip is missing.
@@ -201,9 +201,31 @@ The single source of truth for **what is done, what is in progress, and what com
   words (place words present in the text, the hour typed, a toll/money/speed word present);
   every override is listed in `parser_note`. Run the server from the repo root with
   `--env-file .env` (settings read `.env` relative to the working directory).
+  (5) Address lookup: `GeocodingProvider` protocol (N-04) + `NominatimGeocoder`
+  (`providers/nominatim.py`): ≤ 1 request/s (lock + monotonic clock, shared across threads),
+  `NOMINATIM_USER_AGENT` setting (identifying UA; empty = verified places only), disk cache
+  `data/cache/nominatim/` (gitignored), `viewbox` = region bounding box + `bounded=1`, results
+  outside the box dropped (N-05), ODbL attribution in every interpretation note. Order: verified
+  places → lookup → town fallback. A lookup result is accepted only when its distinctive name
+  words (or its "<number> <street>") AND one of its address localities agree with the words;
+  generic words (pizza, brick, oven…) don't count, so "Brick Oven Pizza, Metuchen" is rejected
+  for "DeLucia's Brick Oven Pizza in Raritan" (unit-tested; live OSM has no DeLucia's, so it uses
+  Raritan, approximate). A result within 250 m of a verified place becomes that place (its
+  checked facts apply). Unknown business in a findable town → that town's center, `estimated`,
+  plus a question; a bare town → "(town center)", `estimated`; a business with no town is not
+  accepted (asks "What town is it in?"). Lookup unreachable → verified places only, and the note
+  says so. Verified end-to-end on port 8010: words → ai-parse → draft posted to /trip/search;
+  Princeton → "350 5th Ave, Manhattan" (Empire State Building, geocoded) returns drive-in
+  congestion **unknown** and parking **unknown**; the DeLucia's sentence ranks Metropark
+  park-and-ride Best overall + Cheapest ($29.40) over driving ($30.55 + unknown parking).
+  `make check`-equivalent green: ruff, mypy strict (54 files), pytest 220.
   Files: `backend/app/parsing/*`, `backend/app/api/v1/trip.py`, `backend/app/trips/{factory,corridor}.py`,
   `backend/app/main.py`, `backend/app/providers/base.py`, `data/regions/nyc-metro-demo-corridor.yaml`,
-  `docs/api-spec.yaml`, tests `test_preload.py`, `test_ai_parse.py`. Requirements: F-01, F-08, N-02, N-04, N-07.
+  `backend/app/providers/{ollama,nominatim}.py`, `backend/app/config.py`, `.env.example`, `DECISIONS.md` (D-19),
+  `docs/api-spec.yaml`, tests `test_preload.py`, `test_ai_parse.py`, `test_ollama_provider.py`, `test_geocoding.py`.
+  Requirements: F-01, F-08, N-02, N-04, N-05, N-07. **Not done / for the merging chat:** the demo page
+  (`backend/app/web/**`, owned by the other chat) has no text box yet — the endpoint is ready for it;
+  the main checkout's `.env` gained `OLLAMA_*` and `NOMINATIM_USER_AGENT` lines (shared via symlink).
 
 - **2026-10-14 — Claude (DEMO SPRINT, page round 4 — human feedback):** A Street / Simple switch on
   the map (top right) replaces needing a second tab for the plain basemap: Street (OpenStreetMap
