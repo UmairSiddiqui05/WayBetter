@@ -12,6 +12,10 @@ from fastapi.testclient import TestClient
 REPO_ROOT = Path(__file__).resolve().parents[2]
 API_SPEC_PATH = REPO_ROOT / "docs" / "api-spec.yaml"
 
+# Set before any test module is collected: modules that import app.main build a settings
+# singleton at import time, and a developer's .env must not leak into it (CI sets this too).
+os.environ.setdefault("ENVIRONMENT", "test")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _test_environment() -> Iterator[None]:

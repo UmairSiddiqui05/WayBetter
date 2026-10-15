@@ -20,9 +20,10 @@ from app import __version__
 from app.api import health
 from app.api.v1 import api_router
 from app.cache import close_redis
-from app.config import API_V1_PREFIX, Settings, get_settings
+from app.config import API_V1_PREFIX, Environment, Settings, get_settings
 from app.db import dispose_engine
 from app.logging import configure_logging
+from app.trips.factory import preload_in_background
 from app.web import page
 
 API_TITLE = "WayBetter API"
@@ -43,6 +44,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment.value,
         region_config_path=settings.region_config_path,
     )
+    if settings.environment is not Environment.TEST:
+        # GTFS load (~10 s) off the event loop: /healthz answers at once, first search is fast.
+        preload_in_background()
     try:
         yield
     finally:
