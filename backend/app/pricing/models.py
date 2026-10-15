@@ -278,3 +278,30 @@ class VehicleDefaults(EffectiveDated):
     gasoline: GasolinePrice
     fuel_economy: FuelEconomy
     cost_scope: str
+
+
+# --- Emissions ---------------------------------------------------------------
+
+
+class GasolineCo2(Sourced):
+    kg_co2_per_gallon: float = Field(gt=0)
+
+
+class TransitCo2(Sourced):
+    """Per passenger-mile factor for the transit modes listed (region feed `modes` values)."""
+
+    modes: tuple[str, ...] = Field(min_length=1)
+    kg_co2_per_passenger_mile: float = Field(gt=0)
+
+
+class EmissionFactors(StrictModel):
+    """Tailpipe CO2 factors (F-14). Not money, so not EffectiveDated's USD currency field."""
+
+    kind: Literal["emission_factors"]
+    effective_from: date
+    effective_to: date | None = None
+    gasoline: GasolineCo2
+    transit: tuple[TransitCo2, ...]
+
+    def transit_factor(self, modes: tuple[str, ...]) -> TransitCo2 | None:
+        return next((f for f in self.transit if set(f.modes) & set(modes)), None)

@@ -176,7 +176,21 @@ data_files:
   tolls_dir: data/tolls
   parking_dir: data/parking
   vehicle_dir: data/vehicle
+  emissions_dir: data/emissions
 
 graph_bundle:
   version: null
   path: data/otp-graphs/current
+
+# "Open in Google Maps / Apple Maps" for drive legs (F-17). Templates, not code: the trip service
+# only fills in {origin_lat} {origin_lng} {destination_lat} {destination_lng} (5 decimals).
+# Turn-by-turn stays in those apps (PLAN "Out of scope"); their route can differ from ours.
+map_handoff:
+  - app_id: google_maps
+    label: Google Maps
+    url_template: "https://www.google.com/maps/dir/?api=1&origin={origin_lat},{origin_lng}&destination={destination_lat},{destination_lng}&travelmode=driving"
+    docs_url: https://developers.google.com/maps/documentation/urls/get-started
+  - app_id: apple_maps
+    label: Apple Maps
+    url_template: "https://maps.apple.com/?saddr={origin_lat},{origin_lng}&daddr={destination_lat},{destination_lng}&dirflg=d"
+    docs_url: https://developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference/MapLinks/MapLinks.html

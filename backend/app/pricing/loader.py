@@ -13,6 +13,7 @@ from app.pricing.models import (
     BarrierToll,
     CrossingToll,
     DestinationParking,
+    EmissionFactors,
     FlatFare,
     ParkingLots,
     RailFares,
@@ -32,7 +33,8 @@ PriceFile = Annotated[
     | ZoneToll
     | ParkingLots
     | DestinationParking
-    | VehicleDefaults,
+    | VehicleDefaults
+    | EmissionFactors,
     Field(discriminator="kind"),
 ]
 _ADAPTER: TypeAdapter[PriceFile] = TypeAdapter(PriceFile)
@@ -53,6 +55,7 @@ class PricingData:
     parking_lots: list[ParkingLots] = field(default_factory=list)
     destination_parking: list[DestinationParking] = field(default_factory=list)
     vehicle_defaults: list[VehicleDefaults] = field(default_factory=list)
+    emission_factors: list[EmissionFactors] = field(default_factory=list)
 
 
 def _parse(path: Path) -> PriceFile:
@@ -66,7 +69,13 @@ def _parse(path: Path) -> PriceFile:
 def load_pricing_data(region: RegionConfig) -> PricingData:
     files = region.data_files
     data = PricingData()
-    for directory in (files.fares_dir, files.tolls_dir, files.parking_dir, files.vehicle_dir):
+    for directory in (
+        files.fares_dir,
+        files.tolls_dir,
+        files.parking_dir,
+        files.vehicle_dir,
+        files.emissions_dir,
+    ):
         for path in sorted(resolve_region_path(directory).glob("*.yaml")):
             match _parse(path):
                 case RailFares() as item:
@@ -87,4 +96,6 @@ def load_pricing_data(region: RegionConfig) -> PricingData:
                     data.destination_parking.append(item)
                 case VehicleDefaults() as item:
                     data.vehicle_defaults.append(item)
+                case EmissionFactors() as item:
+                    data.emission_factors.append(item)
     return data

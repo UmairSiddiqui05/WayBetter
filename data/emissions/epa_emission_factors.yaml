@@ -1,0 +1,43 @@
+# Tailpipe CO2 factors for the emissions estimate and the "cleanest" sort (F-14, D-21).
+# CO2 only, combustion only (tank-to-wheel), as both EPA sources state; no upstream or
+# well-to-wheel emissions, no CH4/N2O. Transit factors apply per passenger-mile to the rail
+# distance ridden; the car factor applies per gallon burned (miles / mpg).
+# HUMAN CHECK: the human spot-checks these factors before item 18 is marked done.
+kind: emission_factors
+effective_from: 2025-01-16   # EPA GHG Emission Factors Hub 2025 release (file created 2025-01-16)
+effective_to: null
+gasoline:
+  kg_co2_per_gallon: 8.887
+  status: estimated
+  human_verified: false
+  source:
+    name: EPA, Greenhouse Gas Emissions from a Typical Passenger Vehicle (last updated 2026-06-03)
+    url: https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle
+    retrieved: 2026-10-15
+    notes: >
+      "CO2 emissions from a gallon of gasoline: 8,887 grams CO2/ gallon" (tailpipe CO2).
+transit:
+  - modes: [commuter_rail]
+    kg_co2_per_passenger_mile: 0.133
+    status: estimated
+    human_verified: false
+    source:
+      name: EPA GHG Emission Factors Hub 2025, Table 10 (Business Travel and Employee Commuting), "Commuter Rail"
+      url: https://www.epa.gov/system/files/other-files/2025-01/ghg-emission-factors-hub-2025.xlsx
+      index_url: https://www.epa.gov/climateleadership/ghg-emission-factors-hub
+      retrieved: 2026-10-15
+      notes: >
+        0.133 kg CO2 per passenger-mile, a US national average (Transportation Energy Data Book
+        ed. 40, 2019 data, per the table's source note), not NJ TRANSIT specific. Same table in
+        the PDF edition (ghg-emission-factors-hub-2025.pdf).
+  - modes: [subway, rapid_transit]
+    kg_co2_per_passenger_mile: 0.093
+    status: estimated
+    human_verified: false
+    source:
+      name: EPA GHG Emission Factors Hub 2025, Table 10, "Transit Rail (i.e. Subway, Tram)"
+      url: https://www.epa.gov/system/files/other-files/2025-01/ghg-emission-factors-hub-2025.xlsx
+      index_url: https://www.epa.gov/climateleadership/ghg-emission-factors-hub
+      retrieved: 2026-10-15
+      notes: >
+        0.093 kg CO2 per passenger-mile, a US national average (same source note), not MTA specific.

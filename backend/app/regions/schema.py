@@ -17,6 +17,7 @@ Two rules this schema enforces structurally:
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -158,6 +159,37 @@ class DataFiles(StrictModel):
     tolls_dir: str
     parking_dir: str
     vehicle_dir: str = "data/vehicle"
+    emissions_dir: str = "data/emissions"
+
+
+MAP_LINK_FIELDS = frozenset({"origin_lat", "origin_lng", "destination_lat", "destination_lng"})
+
+
+class MapHandoff(StrictModel):
+    """An "Open in <app>" link for a drive leg (F-17). The URL is a template so the app list and
+    URL formats are configuration; the trip service only fills in the leg's two ends."""
+
+    app_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    label: str
+    url_template: str = Field(pattern=r"^https://")
+    docs_url: str | None = None
+    """Where the app documents this URL format."""
+
+    @field_validator("url_template")
+    @classmethod
+    def _known_fields(cls, value: str) -> str:
+        used = set(re.findall(r"{([^{}]*)}", value))
+        if not used or not used <= MAP_LINK_FIELDS:
+            raise ValueError(f"url_template may only use {sorted(MAP_LINK_FIELDS)}, got {used}")
+        return value
+
+    def url(self, origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float) -> str:
+        return self.url_template.format(
+            origin_lat=f"{origin_lat:.5f}",
+            origin_lng=f"{origin_lng:.5f}",
+            destination_lat=f"{dest_lat:.5f}",
+            destination_lng=f"{dest_lng:.5f}",
+        )
 
 
 class GraphBundle(StrictModel):
@@ -182,6 +214,7 @@ class RegionConfig(StrictModel):
     city_driving_zones: tuple[CityDrivingZone, ...] = ()
     data_files: DataFiles
     graph_bundle: GraphBundle = GraphBundle()
+    map_handoff: tuple[MapHandoff, ...] = ()
 
     @field_validator("timezone")
     @classmethod
