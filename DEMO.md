@@ -27,9 +27,13 @@ the background (about 5 s), so the first real request is fast.
 **Restart the server after pulling new code.** uvicorn here doesn't auto-reload, so a server
 started earlier keeps serving the old page.
 
-For voice: open **Handy** (in /Applications; it lives in the menu bar). Click in the
-**Type your trip** box, hold Handy's shortcut (default `⌥ Space`), speak, release; the words
-appear in the box. Handy transcribes on this laptop with Whisper, offline.
+For voice: open **Handy** (in /Applications; it lives in the menu bar). There is no voice
+button on the page: click in the **Type your trip** box, hold **`⌥ Option + Space`** (Handy's
+shortcut on this laptop; tap once to start / again to stop also works), speak, release; the
+words appear in the box a second later. Handy transcribes on this laptop with the **Parakeet
+Unified EN 0.6B** model, offline. **Glance at the box before pressing Read it:** speech-to-text
+can mishear place names (tested 2026-10-14: "Raritan" → "Rareton", "Javits" → "Jaffbit"). Fix
+the word, or just press Read it and let the app ask: it won't guess a town it can't confirm.
 
 Health check, if you want it: http://localhost:8000/healthz → `{"status":"ok"}`.
 API docs to show in Q&A: http://localhost:8000/api/v1/docs.
@@ -50,7 +54,11 @@ make check                                           # ruff + mypy + 255 tests
 
 Handy (voice, optional): installed 2026-10-14 from the official GitHub release
 (`cjpais/Handy` v0.9.8, MIT licence, Apple-notarized). First launch asks for **Microphone** and
-**Accessibility** permission and a speech model (pick a Whisper model).
+**Accessibility** permission and a speech model (chosen: **Parakeet Unified EN 0.6B**, 697 MB,
+fast English). In Handy's settings, add the demo's place names to **Custom Words** so they're
+transcribed right: Raritan, Javits, Metropark, Secaucus, Princeton, Hamilton, Lawrenceville,
+Plainsboro. This is Handy's vocabulary list, not WayBetter code; no business is ever
+hard-coded (an unconfirmed business falls back to the town it's in).
 
 ### Morning-of checklist (3 minutes)
 
@@ -60,7 +68,8 @@ Handy (voice, optional): installed 2026-10-14 from the official GitHub release
    Enter. The first reading can take ~5–10 s if the model was unloaded; after that it's 2–5 s.
    (The server keeps the model loaded for 30 minutes after each use, so do this shortly before
    the call, or repeat it.)
-4. Open Handy, dictate one sentence into the box, and check the words land there.
+4. Open Handy, dictate one sentence into the box with `⌥ Option + Space`, and check the words
+   land there spelled right (especially "Raritan" and "Javits").
 5. Set **Leave at = 10/15/2026, 7:00 AM**. The page defaults to the *next* weekday, which on
    the day itself is Friday 10/16. Friday's results differ by a few minutes, which is fine.
    Leave **Head home at = 5:30 PM** (the default, read from the corridor data file).
@@ -284,6 +293,8 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   shows *unknown*. Its location inside the congestion zone was human-confirmed.
 - "Arrive by …" in plain words is recognized but not planned. The page asks for a leave time.
 - Voice is dictation into the text box (Handy, a separate app), not a feature of WayBetter.
+  Misheard place names aren't corrected by the app; an unknown town is reported as not found
+  with a question, never matched to a "close" town.
 
 ## 6. Phase 2 (what comes next)
 

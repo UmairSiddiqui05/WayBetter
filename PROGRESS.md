@@ -163,6 +163,19 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (D-20 follow-up — voice confirmed, human-tested):** Dictation into
+  **Type your trip** works. The human chose Handy's **Parakeet Unified EN 0.6B** model (fast,
+  English, offline) over Whisper Medium (slower live); shortcut `option+space`, hold-or-toggle
+  (read from Handy's settings). Handy's history shows three dictated sentences. **Finding:**
+  "Delucia's" was transcribed correctly, but "Raritan" came out "Rareton" and "Javits" once as
+  "Jaffbit". Replayed through `/trip/ai-parse`: "Rareton" → origin not found + question (no town
+  guessed; difflib 0.71 < 0.88 threshold, as intended); "Jaffbit Center, New York" → New York town
+  center, approximate + question; the correctly spelled sentence → Raritan approximate as before.
+  **Human decision:** no hard-coded businesses and no looser town matching the night before the
+  interview. Mitigation is configuration and habit: add the demo place names to Handy's Custom
+  Words, and glance at the box before Read it. DEMO.md updated (shortcut, model, Custom Words,
+  morning check, limitation). No code change. Files: `DEMO.md`, `PROGRESS.md`. Requirements: F-08, N-02.
+
 - **2026-10-14 — Claude (DEMO SPRINT extension, D-20 — human-approved items 15, 16, 3; interview 2026-10-15):**
   (1) Tagged main `4852acf` as **`demo-safe-1014-ui`** (pushed). `demo/nl-parse` was already fully
   merged into main (0 commits ahead, main 7 ahead), so the merge was a no-op; both its log entries
