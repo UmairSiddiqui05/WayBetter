@@ -16,7 +16,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 - **DEMO SPRINT (D-18)** (Claude, 2026-10-14) — see [DEMO-SPRINT.md](DEMO-SPRINT.md). Corridor:
   **NJ Transit Northeast Corridor → NY Penn** (human switched from the Harlem Line once NJT portal
-  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Follow-up: daily round-trip view (API v0.2.0) added 2026-10-14. Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
+  access arrived, 2026-10-14). **All 7 steps done** (2026-10-14). Follow-up: daily round-trip view (API v0.2.0) added 2026-10-14. Extension D-20 (type-your-trip card with confirm-before-search, API v0.7.0; Handy voice) done 2026-10-14; tags `demo-safe-1014-ui`, `demo-safe-1015`. Demo guide: [DEMO.md](DEMO.md). Remaining human items: price spot-check; close the sprint after the interview.
 
 - **A2 — Data Ingestion** (Claude, 2026-08-04) — *keyless subset only*, on branch `agent/a2-ingestion`.
   Region config + loader, GTFS fetch/validate/provenance, and canonical station IDs are done and
@@ -79,6 +79,9 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Backlog / discovered
 
+- **Turnpike 15X → 14-14C not in the toll data** (found 2026-10-14): Secaucus's trip home from
+  Javits shows its tolls as unknown, so its day and month totals are unknown. Add the pair from the
+  NJTA 2026 Class 1 schedule (human spot-check required).
 - **[Resolved 2026-10-14 — see work log]** **Ranking with unknown costs** (found 2026-10-14, `demo/nl-parse`): an option whose total excludes an unknown component (e.g. drive-in to Javits, parking unknown) is ranked and badged on its partial total. Consider ranking complete-cost options ahead for `cheapest`/`best_overall`, or withholding the Cheapest badge from incomplete options. Needs a human product call.
 - **Send total statuses from the server (N-02):** `CostBreakdown.total` and `RouteOption.total_minutes`
   carry no provenance, so the demo page rolls up the parts' statuses for display. Add
@@ -159,6 +162,47 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT extension, D-20 — human-approved items 15, 16, 3; interview 2026-10-15):**
+  (1) Tagged main `4852acf` as **`demo-safe-1014-ui`** (pushed). `demo/nl-parse` was already fully
+  merged into main (0 commits ahead, main 7 ahead), so the merge was a no-op; both its log entries
+  were already here. `make check` green before any change (252).
+  (2) **Type your trip** (the `#ask` slot): the card no longer runs a search by itself. It shows
+  "Here's what I understood" (one row per `interpretation` item: value, provenance label, default
+  marker, and a **Change** link that copies the draft into the form and focuses the matching field;
+  Home/Tolls open Settings, Rank by focuses the active tab), the clarifying question with its
+  **choices** as buttons, and a **Show options** button (disabled while a missing field is neither
+  picked nor taken over with Change) that fills the form from the draft and runs the normal search,
+  then scrolls to the results. **API v0.7.0**: `/trip/ai-parse` response gains `choices`
+  (`[{field, text}]`, the suggestions of the place whose question is shown; additive). Renderer only
+  (N-01). **Integration fix:** the priority "evidence" regex matched "time" inside "Times Square", so
+  qwen3:8b's invented "least driving" for "from Nassau Street to Times Square" survived the word check;
+  now word-start matches only (also "Short Hills", "breakfast"). Tests: choices on ai-parse, page never
+  searches from `ask()`, place names aren't priority evidence (255 total).
+  (3) **Voice:** Handy v0.9.8 (`cjpais/Handy`, LICENSE = MIT, © 2025 CJ Pais) installed to /Applications
+  from the official release DMG `Handy_0.9.8_aarch64.dmg`: SHA-256 matched GitHub's digest
+  (81ac05aa…9417); `codesign --verify --deep --strict` OK; Gatekeeper "Notarized Developer ID"
+  (Christopher Pais, UWFLB4GC25). No WayBetter code. The human grants Microphone + Accessibility
+  and picks a Whisper model. **Dictation into the box: pending the human's confirmation.**
+  (4) **Verified** on port 8020 (desktop + 375 px): the DeLucia's sentence → Raritan (town center)
+  approximate + Javits + Cheapest first, with the DeLucia's question; form untouched until Show options;
+  then Metropark Cheapest $29.40 / $48.88 a day / $850.58 a month. Scenario A matches DEMO.md to the
+  cent ($27.60 / $45.20 / $773.92 … Drive $76.17 / $95.51; $1,215.87 a month saved). Ollama stopped →
+  same card via the rules parser in 0.25 s, footer says why. `waybetter-api-offline` (port 8001,
+  network denied): Scenario A identical and the local model still reads the sentence. Change links
+  focus origin/destination/when/the active tab/Settings fields; Nassau Street choices enable Show
+  options and the picked place resolves. 375 px: no sideways scroll. No console errors.
+  `npx @redocly/cli lint` passes.
+  (5) Docs: DEMO.md (Ollama start + check, restart-after-pull note, Handy, morning-of model warm-up,
+  talk-track step 8, expected results "D", limitations: verified places only + approximate town
+  fallback, no Raritan Valley Line/transfers, unknown Javits parking, arrive-by, voice is
+  dictation), DECISIONS.md **D-20**, DEMO-SPRINT.md scope note.
+  Files: `backend/app/web/index.html`, `backend/app/parsing/{models,service}.py`,
+  `backend/app/__init__.py`, `docs/api-spec.yaml`, tests `test_web_page.py`, `test_geocoding.py`,
+  `test_ollama_provider.py`, `DEMO.md`, `DECISIONS.md`, `DEMO-SPRINT.md`. Requirements: F-08, F-18,
+  N-01, N-02. **Surprises:** the user's server on port 8000 was started before this work and serves
+  the old page until restarted; Secaucus's trip home from Javits hits an unpriced Turnpike pair
+  (15X→14-14C), so its day/month show unknown (data gap, not changed tonight → backlog).
 
 - **2026-10-14 — Claude (DEMO SPRINT extension — time up front + "least driving", human-reported):**
   (1) **Time as prominent as price:** every option row now leads with door-to-door time

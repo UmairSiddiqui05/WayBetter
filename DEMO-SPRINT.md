@@ -5,6 +5,11 @@ D-05/D-06/D-16, and the agent-task briefs wherever they conflict (see D-18). Whe
 ends, set Status to CLOSED and resume the normal plan; nothing here deletes the long-term
 architecture.
 
+> **Scope extension (D-20, approved 2026-10-14):** the "LLM layer" row below is partly lifted
+> for the demo: plain-words trip entry (`POST /trip/ai-parse`, local model per D-19, confirm
+> before search) and voice by dictation (Handy, a separate app). Alerts, sessions UI and the
+> rest stay out of scope. Everything under "Rules that STILL apply" still applies.
+
 ## Goal
 One reliable, explainable, screen-shareable demo by **~7pm ET on 2026-10-14**, for a 30-minute
 Deloitte Government & Public Services project-portfolio interview the next day (live demo +

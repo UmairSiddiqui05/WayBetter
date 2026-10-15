@@ -5,18 +5,31 @@ WayBetter compares **driving all the way into Manhattan** against **four park-an
 NJ TRANSIT's Northeast Corridor**, using real timetables and official toll, fare and parking
 prices. It ranks the options and draws them on a map, and every number shows where it came from.
 It also prices the **whole commute**: the trip home at 5:30 PM, the daily total, and what that
-adds up to per month and per year compared with driving.
+adds up to per month and per year compared with driving. You can also **type or say the trip in
+plain English**: a local AI model reads it, the page shows what it understood and where each
+value came from, and nothing is searched until you press **Show options**.
 
 ---
 
 ## 1. Start it (fresh terminal)
 
 ```bash
+brew services start ollama          # the local AI model server (already set to start at login)
+curl -s localhost:11434/api/tags    # should list qwen3:8b; if it errors, Ollama isn't running
 cd ~/Desktop/TransitApp
 backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000 --env-file .env
 ```
 
-Open **http://localhost:8000**. Leave the terminal running; `Ctrl+C` stops it.
+Open **http://localhost:8000**. Leave the terminal running; `Ctrl+C` stops it. On startup the
+server loads the timetable, runs one warm-up comparison and loads the AI model into memory in
+the background (about 5 s), so the first real request is fast.
+
+**Restart the server after pulling new code.** uvicorn here doesn't auto-reload, so a server
+started earlier keeps serving the old page.
+
+For voice: open **Handy** (in /Applications; it lives in the menu bar). Click in the
+**Type your trip** box, hold Handy's shortcut (default `⌥ Space`), speak, release; the words
+appear in the box. Handy transcribes on this laptop with Whisper, offline.
 
 Health check, if you want it: http://localhost:8000/healthz → `{"status":"ok"}`.
 API docs to show in Q&A: http://localhost:8000/api/v1/docs.
@@ -29,18 +42,31 @@ demo, which needs neither.
 make install PYTHON=/opt/miniconda3/bin/python3.13   # Python venv + dependencies
 make env                                             # creates .env; put your NJT portal login in it
 make fetch-feeds                                     # downloads MTA + NJ TRANSIT timetables (GTFS)
-make warm-cache                                      # caches the 36 demo driving routes (morning + home)
-make check                                           # ruff + mypy + 122 tests
+make warm-cache                                      # caches the demo driving routes (morning + home)
+brew install ollama && brew services start ollama    # local AI model server
+ollama pull qwen3:8b                                 # the model (5.2 GB, one time)
+make check                                           # ruff + mypy + 255 tests
 ```
 
-### Morning-of checklist (2 minutes)
+Handy (voice, optional): installed 2026-10-14 from the official GitHub release
+(`cjpais/Handy` v0.9.8, MIT licence, Apple-notarized). First launch asks for **Microphone** and
+**Accessibility** permission and a speech model (pick a Whisper model).
 
-1. Start the server as above and open the page.
-2. Set **Leave at = 10/15/2026, 7:00 AM**. The page defaults to the *next* weekday, which on
+### Morning-of checklist (3 minutes)
+
+1. `curl -s localhost:11434/api/tags` lists `qwen3:8b` (else `brew services start ollama`).
+2. Start the server as above (a fresh start, so it serves today's code) and open the page.
+3. **Warm the model:** type `from Princeton to Times Square` in **Type your trip** and press
+   Enter. The first reading can take ~5–10 s if the model was unloaded; after that it's 2–5 s.
+   (The server keeps the model loaded for 30 minutes after each use, so do this shortly before
+   the call, or repeat it.)
+4. Open Handy, dictate one sentence into the box, and check the words land there.
+5. Set **Leave at = 10/15/2026, 7:00 AM**. The page defaults to the *next* weekday, which on
    the day itself is Friday 10/16. Friday's results differ by a few minutes, which is fine.
    Leave **Head home at = 5:30 PM** (the default, read from the corridor data file).
-3. Run Scenario A and confirm the numbers match the table below.
-4. Keep the API docs tab open for the technical questions.
+6. Run Scenario A and confirm the numbers match the table below.
+7. Run the plain-words example (section 2, step 8) once and check it against section 3.
+8. Keep the API docs tab open for the technical questions.
 
 ---
 
@@ -78,6 +104,20 @@ make check                                           # ruff + mypy + 122 tests
    changes the answer, and the system knows why."*
 7. Switch **Rank by → Fastest**, then **Cheapest**. *"Same data, different priorities. The
    ranking happens on the server, so a future iPhone app gives identical answers."*
+
+8. **Type or say a trip.** Click in **Type your trip** and type (or dictate with Handy):
+   *"I have to get from DeLucia's Brick Oven Pizza in Raritan to the Javits Center, as cheaply
+   as possible."* Press Enter.
+   *"A local AI model running on this laptop reads the sentence, but it only fills in a form.
+   It never picks a route or a price. Here's what it understood: Raritan, marked approximate,
+   because it can't confirm the pizzeria itself, so it asks me whether the town center is close
+   enough. The Javits Center is a place we've verified. Cheapest first came from my words. And
+   the time, home time and toll payment are labelled as defaults because I didn't say them."*
+   Point at the note under the card: *"Code then checks the model's answer against my actual
+   words and drops anything I didn't say."* Click **Show options**. *"Nothing runs until I
+   confirm. Now it's the normal comparison: Metropark is cheapest at $29.40, and driving shows
+   parking as unknown, because we don't have a sourced garage price near the Javits Center."*
+   If anything's wrong, click **Change** next to that row; it jumps to the field to fix.
 
 **Scenario B: Lawrenceville → Bryant Park.** *"Lawrenceville is next to Hamilton station, but
 Hamilton isn't the cheapest choice: its fare is $19.75 and parking is $13, against $13.05 and
@@ -124,6 +164,33 @@ cheapest) · Princeton Jct $31.96 / $52.29 / $825.88 / $1,204.12 · Hamilton $34
 $916.54 / $1,113.46 · Secaucus $54.08 / $77.60 / $1,558.25 / $471.75 · Drive $77.08 / $97.44 /
 $2,030.00 (fastest, 77 min; Turnpike 8A→16E $11.45 in, 16E→8A $11.45 home).
 
+**D. Plain words:** *"I have to get from DeLucia's Brick Oven Pizza in Raritan to the Javits
+Center, as cheaply as possible"* (Thursday 10/15, read on Wednesday evening).
+
+Understood card: From **Raritan (town center) (approximate for DeLucia's Brick Oven Pizza)**,
+*estimated* · To **Javits Center (429 11th Ave)**, *AI generated* · When **Leave Thu Oct 15,
+7:00 AM**, default · Home **5:30 PM**, default · Rank by **Cheapest first**, *AI generated* ·
+Tolls **E-ZPass**, default. Question: *"I couldn't find "DeLucia's Brick Oven Pizza" exactly,
+so I started from Raritan (town center). Is that close enough, or what's the street address?"*
+Footer: "Read by a local AI model (qwen3:8b) · Checked the model against your words: used the
+destination read exactly from your text; dropped the toll payment you didn't mention." Reading
+takes 2–5 s warm. With Ollama stopped the card is identical but says "Read by the rules parser"
+(~0.3 s).
+
+After **Show options** (Cheapest tab):
+
+| Option | Morning train | Door to door | One-way | Day | Month |
+|---|---|---|---|---|---|
+| ⭐ Park at Metropark *(Cheapest)* | 7:59 → 8:38 | 111 min | **$29.40** | $48.88 | $850.58 |
+| Park at Princeton Jct. | 7:47 → 8:52 | 125 min | $38.03 | $64.09 | $1,071.71 |
+| Park at Hamilton | 8:36 → 9:39 | 172 min | $40.41 | $67.85 | $1,153.62 |
+| Park at Secaucus | 8:16 → 8:28 | 101 min | $45.46 | unknown | unknown |
+| Drive all the way *(Fastest)* | — | 63 min | $30.55 + unknown parking | unknown | unknown |
+
+Javits has no sourced garage price, so driving's total excludes parking and ranks after the
+complete totals. Secaucus's trip home crosses a Turnpike pair that isn't in the toll data
+(15X → 14-14C), so its day and month show unknown.
+
 Bryant Park and Times Square give the same costs; only the final walk differs. Ranking uses the
 morning trip, and in all three scenarios the daily totals rank the options in the same order.
 
@@ -141,6 +208,14 @@ TRANSIT's official GTFS timetable). A pure-Python **cost engine** prices each op
 recording its source URL and retrieval date, with no prices written into code. The engine then
 ranks the options and writes the labels and the one-line explanation. Switching to production
 means swapping in Mapbox and OpenTripPlanner adapters; the cost engine and the page don't change.
+
+The plain-words box uses the same rule. `POST /api/v1/trip/ai-parse` sends the sentence to an
+`LLMProvider`: tonight a local model (qwen3:8b through Ollama), with a deterministic rules
+parser as the fallback. The model must answer in a fixed schema (no extra fields). Code then
+checks every value against the user's words, resolves places (verified places first, then an
+OpenStreetMap address lookup that must agree on name and town, then an approximate town
+center), and returns a draft request with a provenance label on each value. The page shows it
+and waits for the user to confirm.
 
 ```
 Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
@@ -196,6 +271,19 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
   same way in all three scenarios.
 - The Garden State Parkway is modeled only between its Raritan and Union plazas (mileposts
   125.5–142.5); a Parkway trip outside that stretch shows its toll as unknown.
+- **Plain words only know verified places plus what the address lookup can confirm.** A
+  business it can't confirm in a known town (DeLucia's in Raritan) falls back to that town's
+  center, marked *approximate*, with a question. Anything else is left blank with a question,
+  never guessed. New addresses need the internet (OpenStreetMap); with Wi-Fi off, only verified
+  places and previously looked-up addresses work.
+- **No Raritan Valley Line and no transfers yet.** A Raritan trip drives to a Northeast
+  Corridor station (Metropark), although Raritan has its own station on the Raritan Valley
+  Line. That needs a second line and, for most trains, a transfer at Newark Penn, which is Phase 2
+  (OpenTripPlanner).
+- **Javits Center facts that are unknown:** no sourced parking rate nearby, so driving's parking
+  shows *unknown*. Its location inside the congestion zone was human-confirmed.
+- "Arrive by …" in plain words is recognized but not planned. The page asks for a leave time.
+- Voice is dictation into the text box (Handy, a separate app), not a feature of WayBetter.
 
 ## 6. Phase 2 (what comes next)
 
@@ -222,10 +310,13 @@ Browser (Leaflet page) ──POST /trip/search──▶ FastAPI
 - **"How does it scale to other cities?"** Regions are data: a new metro is a new config plus
   data files, with no code changes. NJ TRANSIT was added today almost entirely as data; the
   one code change was a generic "log in, get a token" download step that any agency can reuse.
-- **"Where's the AI?"** Deliberately out of scope tonight. The plan uses an LLM only to *parse*
-  requests into a validated schema and to *phrase* explanations from computed numbers, never to
-  invent routes or prices.
-- **"What did you test?"** 122 automated tests (cost math, toll detection in both directions,
+- **"Where's the AI?"** Only in reading the request. A local model fills a validated form, code
+  checks it against the user's words, and the user confirms before any search. It never
+  invents routes, prices or places. It runs on the laptop (no API key, no per-call cost; only a
+  place name it doesn't know goes to OpenStreetMap's address lookup), and if it's down a rules
+  parser takes over. The production
+  plan (D-10) swaps in a cloud model behind the same interface.
+- **"What did you test?"** 255 automated tests (cost math, toll detection in both directions,
   once-a-day charges, monthly-pass math, ranking, unknown handling, session tokens, API
   contract), plus end-to-end runs against the real NJ TRANSIT feed, including one with all
   network access blocked.
