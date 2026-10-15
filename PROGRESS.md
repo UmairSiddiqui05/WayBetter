@@ -79,7 +79,7 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Backlog / discovered
 
-- **Ranking with unknown costs** (found 2026-10-14, `demo/nl-parse`): an option whose total excludes an unknown component (e.g. drive-in to Javits, parking unknown) is ranked and badged on its partial total. Consider ranking complete-cost options ahead for `cheapest`/`best_overall`, or withholding the Cheapest badge from incomplete options. Needs a human product call.
+- **[Resolved 2026-10-14 — see work log]** **Ranking with unknown costs** (found 2026-10-14, `demo/nl-parse`): an option whose total excludes an unknown component (e.g. drive-in to Javits, parking unknown) is ranked and badged on its partial total. Consider ranking complete-cost options ahead for `cheapest`/`best_overall`, or withholding the Cheapest badge from incomplete options. Needs a human product call.
 - **Send total statuses from the server (N-02):** `CostBreakdown.total` and `RouteOption.total_minutes`
   carry no provenance, so the demo page rolls up the parts' statuses for display. Add
   `total_provenance` (and a minutes status) in the next API version so the client renders it
@@ -159,6 +159,21 @@ The single source of truth for **what is done, what is in progress, and what com
    item, Phase 0 checklist).
 
 ## Work log (append-only, newest first)
+
+- **2026-10-14 — Claude (DEMO SPRINT extension — ranking with unknown costs, human-approved):**
+  Resolves the backlog item. An option whose total excludes an unknown cost (parking, congestion
+  toll, an unpriced toll) only has a lower bound, so for `cheapest` and `best_overall` it now ranks
+  after every option whose costs are all known (`fastest` unchanged: time is always known). The
+  best-overall score normalizes cost by the cheapest *complete* total. Badges: "Best overall" is
+  computed with the best-overall rule whatever tab is active (it used to go to whatever ranked
+  first in the requested mode); "Cheapest" goes only to a complete total, and to nobody when
+  every total is partial. Partial options' explanation says why they rank lower. Verified live on
+  port 8000: typed "75 West Main St, Somerville NJ" → "350 5th Ave, Manhattan" now shows Metropark
+  "Best overall · Cheapest" ($26.18) instead of Drive ($24.74 + unknown parking/congestion);
+  Princeton/Raritan → Javits and Princeton → Times Square likewise. Tests: three new in
+  `test_trip_search.py` (unit rank/badge rules + a search to an unverified destination);
+  ruff/mypy/pytest green (231). Files: `backend/app/trips/service.py`,
+  `backend/tests/test_trip_search.py`. Requirements: F-06, F-07, N-02.
 
 - **2026-10-14 — Claude (DEMO SPRINT extension — typed From/To, human-requested):** From and To on
   the demo page are now text fields (suggested places via a datalist, plus any typed address);

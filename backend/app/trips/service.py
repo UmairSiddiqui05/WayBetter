@@ -13,6 +13,7 @@ All of it is server-side; the client only renders this payload (N-01).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -876,33 +877,49 @@ class TripSearchService:
     # -- ranking and explanation ------------------------------------------------------
 
     @staticmethod
-    def _rank(options: list[_Option], sort_mode: str) -> list[_Option]:
-        if not options:
-            return []
-        min_cost = min((o.known_cost for o in options), default=0) or 1.0
-        min_time = min(o.route.total_minutes for o in options) or 1.0
+    def _rank_keys(options: list[_Option]) -> dict[str, Callable[[_Option], tuple[float, ...]]]:
+        """Sort keys per mode. An option with an unknown cost has only a partial total — a lower
+        bound — so for cost-based modes it ranks after every option whose total is complete;
+        a partial total can never win on price (N-02). Time is always known, so "fastest" is
+        unaffected."""
+        complete = [o for o in options if o.complete_cost] or options
+        min_cost = min((o.known_cost for o in complete), default=0) or 1.0
+        min_time = min((o.route.total_minutes for o in options), default=0) or 1.0
 
         def score(o: _Option) -> float:
             # Equal weight to money and time, each relative to the best available option.
             return o.known_cost / min_cost + o.route.total_minutes / min_time
 
-        keys = {
+        def partial(o: _Option) -> float:
+            return 0.0 if o.complete_cost else 1.0
+
+        return {
             "fastest": lambda o: (o.route.total_minutes, o.known_cost),
-            "cheapest": lambda o: (o.known_cost, o.route.total_minutes),
-            "best_overall": lambda o: (score(o), o.route.total_minutes),
+            "cheapest": lambda o: (partial(o), o.known_cost, o.route.total_minutes),
+            "best_overall": lambda o: (partial(o), score(o), o.route.total_minutes),
         }
+
+    @classmethod
+    def _rank(cls, options: list[_Option], sort_mode: str) -> list[_Option]:
+        if not options:
+            return []
+        keys = cls._rank_keys(options)
         return sorted(options, key=keys.get(sort_mode, keys["best_overall"]))
 
-    @staticmethod
-    def _label_and_explain(ranked: list[_Option]) -> None:
+    @classmethod
+    def _label_and_explain(cls, ranked: list[_Option]) -> None:
         if not ranked:
             return
-        fastest = min(ranked, key=lambda o: o.route.total_minutes)
-        cheapest = min(ranked, key=lambda o: o.known_cost)
+        keys = cls._rank_keys(ranked)
+        best = min(ranked, key=keys["best_overall"])
+        fastest = min(ranked, key=keys["fastest"])
         badges: dict[str, list[str]] = {o.route.route_id: [] for o in ranked}
-        badges[ranked[0].route.route_id].append("Best overall")
+        badges[best.route.route_id].append("Best overall")
         badges[fastest.route.route_id].append("Fastest")
-        badges[cheapest.route.route_id].append("Cheapest")
+        complete = [o for o in ranked if o.complete_cost]
+        if complete:  # no "Cheapest" claim at all when every total is partial
+            cheapest = min(complete, key=keys["cheapest"])
+            badges[cheapest.route.route_id].append("Cheapest")
         drive = next((o for o in ranked if o.route.route_id == "drive"), None)
         for o in ranked:
             r = o.route
@@ -933,7 +950,10 @@ class TripSearchService:
                         text += f", ${abs(savings.monthly.amount):,.0f} a month"
                     text += "."
             if not o.complete_cost:
-                text += " Some costs are unknown (see warnings)."
+                text += (
+                    " Some costs are unknown (see warnings), so it ranks after options whose"
+                    " costs are all known."
+                )
             r.explanation = Explanation(text=text, provenance=Provenance.ESTIMATED)
 
     def _disclaimers(self) -> list[str]:

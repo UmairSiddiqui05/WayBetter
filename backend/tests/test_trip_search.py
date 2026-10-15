@@ -22,7 +22,7 @@ from app.trips.models import (
     TripSearchRequest,
     TripSearchResponse,
 )
-from app.trips.service import Station, TripSearchError, TripSearchService
+from app.trips.service import Station, TripSearchError, TripSearchService, _Option
 
 NY = ZoneInfo("America/New_York")
 PENN = "nyc-metro:njt_rail:new-york-penn-station"
@@ -431,3 +431,60 @@ def test_api_returns_the_round_trip_and_validates_return_time(
     assert ok.status_code == 200
     assert all(r["round_trip"]["monthly_cost"]["provenance"] for r in ok.json()["routes"])
     assert bad.status_code == 422
+
+
+# -- ranking with unknown costs (N-02) -------------------------------------------------
+
+
+def _opt(route_id: str, cost: float, minutes: float, complete: bool) -> _Option:
+    route = RouteOption.model_construct(
+        route_id=route_id, total_minutes=minutes, label=None, round_trip=None, explanation=None
+    )
+    return _Option(route=route, known_cost=cost, complete_cost=complete)
+
+
+def test_a_partial_total_never_wins_on_price() -> None:
+    """Driving to an unverified destination: parking and congestion unknown, so $24.74 is only
+    a lower bound and must not beat a complete $26.18."""
+    drive = _opt("drive", 24.74, 67, complete=False)
+    metro = _opt("pnr-metropark", 26.18, 110, complete=True)
+    hamilton = _opt("pnr-hamilton", 34.00, 140, complete=True)
+    options = [drive, metro, hamilton]
+
+    assert [o.route.route_id for o in TripSearchService._rank(options, "cheapest")] == [
+        "pnr-metropark",
+        "pnr-hamilton",
+        "drive",
+    ]
+    assert TripSearchService._rank(options, "best_overall")[0] is metro
+    assert TripSearchService._rank(options, "fastest")[0] is drive  # time is known
+
+    TripSearchService._label_and_explain(TripSearchService._rank(options, "best_overall"))
+    assert metro.route.label == "Best overall · Cheapest"
+    assert drive.route.label == "Fastest"
+    assert "ranks after options whose costs are all known" in drive.route.explanation.text
+
+
+def test_no_cheapest_badge_when_every_total_is_partial() -> None:
+    a, b = _opt("a", 10.0, 50, complete=False), _opt("b", 12.0, 40, complete=False)
+
+    TripSearchService._label_and_explain(TripSearchService._rank([a, b], "cheapest"))
+
+    assert "Cheapest" not in f"{a.route.label} {b.route.label}"
+
+
+def test_search_to_an_unverified_destination_ranks_complete_costs_first(
+    service: TripSearchService,
+) -> None:
+    near_times_square = {"lat": 40.7484, "lng": -73.9857, "label": "Empire State Building"}
+    for mode in ("cheapest", "best_overall"):
+        routes = service.search(
+            request(destination=near_times_square, preferences={"sort_mode": mode}), NOW
+        ).routes
+        partial = [any(w.startswith("Total excludes") for w in r.warnings) for r in routes]
+
+        assert any(partial) and not all(partial)
+        assert partial == sorted(partial)  # every complete total before any partial one
+        for r, is_partial in zip(routes, partial, strict=True):
+            if is_partial:
+                assert "Cheapest" not in (r.label or "") and "Best overall" not in (r.label or "")
