@@ -436,9 +436,16 @@ def test_api_returns_the_round_trip_and_validates_return_time(
 # -- ranking with unknown costs (N-02) -------------------------------------------------
 
 
-def _opt(route_id: str, cost: float, minutes: float, complete: bool) -> _Option:
+def _opt(
+    route_id: str, cost: float, minutes: float, complete: bool, drive: float | None = None
+) -> _Option:
     route = RouteOption.model_construct(
-        route_id=route_id, total_minutes=minutes, label=None, round_trip=None, explanation=None
+        route_id=route_id,
+        total_minutes=minutes,
+        drive_minutes=minutes if drive is None else drive,
+        label=None,
+        round_trip=None,
+        explanation=None,
     )
     return _Option(route=route, known_cost=cost, complete_cost=complete)
 
@@ -447,8 +454,8 @@ def test_a_partial_total_never_wins_on_price() -> None:
     """Driving to an unverified destination: parking and congestion unknown, so $24.74 is only
     a lower bound and must not beat a complete $26.18."""
     drive = _opt("drive", 24.74, 67, complete=False)
-    metro = _opt("pnr-metropark", 26.18, 110, complete=True)
-    hamilton = _opt("pnr-hamilton", 34.00, 140, complete=True)
+    metro = _opt("pnr-metropark", 26.18, 110, complete=True, drive=40)
+    hamilton = _opt("pnr-hamilton", 34.00, 140, complete=True, drive=20)
     options = [drive, metro, hamilton]
 
     assert [o.route.route_id for o in TripSearchService._rank(options, "cheapest")] == [
@@ -462,6 +469,7 @@ def test_a_partial_total_never_wins_on_price() -> None:
     TripSearchService._label_and_explain(TripSearchService._rank(options, "best_overall"))
     assert metro.route.label == "Best overall · Cheapest"
     assert drive.route.label == "Fastest"
+    assert hamilton.route.label == "Least driving"
     assert "ranks after options whose costs are all known" in drive.route.explanation.text
 
 
@@ -488,3 +496,26 @@ def test_search_to_an_unverified_destination_ranks_complete_costs_first(
         for r, is_partial in zip(routes, partial, strict=True):
             if is_partial:
                 assert "Cheapest" not in (r.label or "") and "Best overall" not in (r.label or "")
+
+
+def test_least_driving_ranks_by_minutes_behind_the_wheel() -> None:
+    """ "Minimize time spent driving" is not "fastest": driving all the way is quickest door to
+    door but has the most driving."""
+    drive = _opt("drive", 40.0, 63, complete=True, drive=63)
+    metro = _opt("pnr-metropark", 29.4, 111, complete=True, drive=40)
+    near = _opt("pnr-new-brunswick", 31.0, 105, complete=True, drive=12)
+
+    ranked = TripSearchService._rank([drive, metro, near], "least_driving")
+
+    assert [o.route.route_id for o in ranked] == ["pnr-new-brunswick", "pnr-metropark", "drive"]
+    TripSearchService._label_and_explain(ranked)
+    assert "Least driving" in (near.route.label or "")
+    assert "Fastest" in (drive.route.label or "")
+
+
+def test_least_driving_is_offered_as_a_sort(service: TripSearchService) -> None:
+    out = service.search(request(preferences={"sort_mode": "least_driving"}), NOW)
+
+    assert "least_driving" in out.sort_options
+    drives = [r.drive_minutes for r in out.routes]
+    assert drives == sorted(drives)

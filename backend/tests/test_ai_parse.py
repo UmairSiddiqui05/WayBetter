@@ -88,6 +88,12 @@ def test_rules_parser_times(text: str, field: str, expected: str) -> None:
         ("fastest route please", "fastest"),
         ("something quick", "fastest"),
         ("from Princeton to Times Square", None),
+        ("from X to the Javits Center and minimize time spent driving", "least_driving"),
+        ("I want to drive as little as possible", "least_driving"),
+        ("I don't want to drive into the city", "least_driving"),
+        ("less time behind the wheel please", "least_driving"),
+        ("minimize travel time", "fastest"),
+        ("cheapest, and I hate to drive", "cheapest"),
     ],
 )
 def test_rules_parser_priority(text: str, priority: str | None) -> None:

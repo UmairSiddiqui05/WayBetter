@@ -32,6 +32,7 @@ _FROM_WORDS = "Read from your words"
 _PRIORITY_LABELS = {
     "cheapest": "Cheapest first",
     "fastest": "Fastest first",
+    "least_driving": "Least driving first",
     "best_overall": "Best overall",
 }
 
@@ -50,7 +51,7 @@ def _leave_label(at: datetime, hhmm: str) -> str:
 _EVIDENCE = {
     "priority": re.compile(
         r"cheap|money|cost|price|budget|afford|spend|sav(?:e|ing)|expens|fast|quick|hurry"
-        r"|soon|rush|short|time",
+        r"|soon|rush|short|time|driv|wheel",
         re.IGNORECASE,
     ),
     "toll_payment": re.compile(r"cash|e[\s-]?z[\s-]?pass|toll|transponder", re.IGNORECASE),

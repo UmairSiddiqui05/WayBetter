@@ -35,7 +35,7 @@ class VehicleProfile(_Request):
 
 
 class Preferences(_Request):
-    sort_mode: Literal["best_overall", "fastest", "cheapest"] = "best_overall"
+    sort_mode: Literal["best_overall", "fastest", "cheapest", "least_driving"] = "best_overall"
 
 
 class TripSearchRequest(_Request):

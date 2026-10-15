@@ -214,3 +214,17 @@ def test_model_time_dropped_when_no_such_hour_was_typed() -> None:
 
     assert out.draft.target_time is not None
     assert out.draft.target_time.strftime("%H:%M") == "07:00"  # the marked default, not 8:00
+
+
+def test_model_fastest_is_overridden_when_the_words_say_less_driving() -> None:
+    """Live (2026-10-14): qwen3:8b read "minimize time spent driving" as fastest, which ranks
+    driving all the way first — the opposite of what the user asked."""
+    content = json.dumps(
+        {"origin_text": "Princeton", "destination_text": "Javits Center", "priority": "fastest"}
+    )
+    out = _service(_provider(_reply(content))).parse(
+        "I want to go from Princeton to Javits Center and minimize time spent driving", NOW
+    )
+
+    assert out.draft.preferences.sort_mode == "least_driving"
+    assert out.parser_note and "priority" in out.parser_note

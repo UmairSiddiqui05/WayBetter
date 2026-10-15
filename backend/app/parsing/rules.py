@@ -55,8 +55,26 @@ _CHEAP = re.compile(
     re.IGNORECASE,
 )
 _FAST = re.compile(
-    r"\bfast(?:est|er)?\b|\bquick(?:est|ly|er)?\b|\basap\b|\bas\s+soon\s+as\b|\bshortest\b",
+    r"\bfast(?:est|er)?\b|\bquick(?:est|ly|er)?\b|\basap\b|\bas\s+soon\s+as\b|\bshortest\b"
+    r"|\b(?:minimi[sz]e|least|less|save|saving|cut|reduce)\s+(?:the\s+|my\s+|total\s+|travel\s+)*time\b",
     re.IGNORECASE,
+)
+# Less time *behind the wheel* — not the same as fastest door to door (driving all the way is
+# usually fastest and has the most driving). Checked before _FAST: "minimize time spent driving".
+_LESS_DRIVING = re.compile(
+    r"\b(?:minimi[sz]e|least|less|reduce|cut|limit|avoid|without|fewer)\s+(?:\w+\s+){0,4}?"
+    r"(?:driving|drive|driven|behind\s+the\s+wheel)\b"
+    r"|\b(?:time|minutes|hours)\s+(?:spent\s+)?(?:driving|behind\s+the\s+wheel|in\s+the\s+car)\b"
+    r"|\bdriv(?:e|ing)\s+(?:as\s+)?(?:little|less)\b"
+    r"|\b(?:don'?t|do\s+not|hate\s+to|rather\s+not)\s+(?:want\s+to\s+|like\s+to\s+)?drive\b"
+    r"|\bnot\s+(?:to\s+)?drive\s+(?:much|a\s+lot|far|into)\b",
+    re.IGNORECASE,
+)
+Priority = Literal["cheapest", "fastest", "least_driving"]
+_PRIORITIES: tuple[tuple[Priority, re.Pattern[str]], ...] = (
+    ("least_driving", _LESS_DRIVING),
+    ("cheapest", _CHEAP),
+    ("fastest", _FAST),
 )
 _EZPASS = r"e[\s-]?z[\s-]?pass"
 _CASH = re.compile(
@@ -115,12 +133,14 @@ class RulesParser:
                 joined = _clean_place(f"{places[last]}, {tail['t']}")
                 origin, destination = (joined, destination) if last == "o" else (origin, joined)
 
-        priority: Literal["cheapest", "fastest"] | None = None
-        cheap, fast = _CHEAP.search(text), _FAST.search(text)
-        if cheap and (not fast or cheap.start() < fast.start()):
-            priority = "cheapest"
-        elif fast:
-            priority = "fastest"
+        priority: Priority | None = None
+        found: list[tuple[int, Priority]] = [
+            (m.start(), name) for name, rx in _PRIORITIES if (m := rx.search(text))
+        ]
+        if found:
+            # The first thing said wins; at the same spot the earlier rule wins, so "minimize
+            # time spent driving" is least_driving, not fastest.
+            priority = min(found, key=lambda f: f[0])[1]
 
         toll: Literal["ezpass", "cash"] | None = (
             "cash" if _CASH.search(text) else "ezpass" if _HAS_EZPASS.search(text) else None

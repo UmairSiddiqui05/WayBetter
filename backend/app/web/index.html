@@ -133,7 +133,9 @@
   .row-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .name { font-weight: 750; font-size: 17px; line-height: 1.25; letter-spacing: -0.01em; }
   .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .figs { display: flex; gap: 16px; flex: 0 0 auto; }
   .num { text-align: right; white-space: nowrap; line-height: 1.25; }
+  .num.time { text-align: left; padding-right: 16px; border-right: 1px solid var(--line); }
   .num b { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
   .num .unit { display: block; font-size: 11px; color: var(--muted); font-weight: 650; }
   .num .alt { display: block; font-size: 12px; color: var(--ink-2); }
@@ -248,6 +250,10 @@
     #map { height: 42vh; order: -1; }
     aside { border-right: 0; overflow: visible; }
     .view { padding: 12px 16px 8px; }
+  }
+  @media (max-width: 480px) {  /* name on its own line; time and price side by side under it */
+    .row-main { flex-direction: column; gap: 6px; }
+    .figs { width: 100%; justify-content: space-between; }
   }
   @media (max-width: 420px) {
     .tiles .v { font-size: 17px; }
@@ -410,6 +416,8 @@ const hhmm = (s) => s ? clock(`0000-00-00T${s}`) : "";
 const money = (v) => (v === null || v === undefined) ? "unknown"
   : `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const mins = (m) => `${Math.round(m)} min`;
+// Headline duration: "43 min", "1 h 51 min".
+const dur = (m) => { const t = Math.round(m); return t < 60 ? `${t} min` : `${Math.floor(t / 60)} h${t % 60 ? ` ${t % 60} min` : ""}`; };
 const humanize = (key) => { const s = String(key).replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
 const titleCase = (s) => String(s).toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 
@@ -705,7 +713,7 @@ function savedText(e, unit) {
 function metaHtml(r) {
   const first = r.legs[0], last = r.legs[r.legs.length - 1];
   const parts = [];
-  if (first && last) parts.push(val(`${range(first.start_time, last.end_time)} · ${mins(r.total_minutes)}`, timeProv(r.legs)));
+  if (first && last) parts.push(val(range(first.start_time, last.end_time), timeProv(r.legs)));
   const s = r.round_trip && r.round_trip.savings_vs_drive;
   if (s) parts.push(`<span class="save">${period === "month" ? savedText(s.monthly, "a month") : savedText(s.daily, "a day")}</span>`);
   return parts.join(" · ");
@@ -717,11 +725,16 @@ function renderRows() {
     const f = figures(r), h = f[period], rt = r.round_trip;
     const others = Object.keys(f).filter((k) => k !== period)
       .map((k) => `<span class="alt">${val(money(f[k].amount), f[k].prov)} ${f[k].alt}</span>`).join("");
+    // Time first and as big as the price: minutes are what most commuters want to cut.
+    const tp = timeProv(r.legs);
+    const time = `<div class="num time"><b>${val(dur(r.total_minutes), tp)}</b><span class="unit">door to door</span>
+      <span class="alt">${val(mins(r.drive_minutes), tp)} driving</span>
+      ${rt ? `<span class="alt">${val(dur(rt.daily_minutes), timeProv([...r.legs, ...rt.return_legs]))} a day</span>` : ""}</div>`;
     return `<li class="row ${idx === selected ? "selected" : ""}" data-idx="${idx}" tabindex="0" role="button"
-        aria-label="${esc(rowTitle(r))}: ${esc(money(h.amount))} ${h.unit}. Open details">
+        aria-label="${esc(rowTitle(r))}: ${esc(dur(r.total_minutes))} door to door, ${esc(mins(r.drive_minutes))} driving, ${esc(money(h.amount))} ${h.unit}. Open details">
       ${tagHtml(r)}
       <div class="row-main"><div><div class="name">${esc(rowTitle(r))}</div><div class="sub">${esc(rowSub(r))}</div></div>
-        <div class="num"><b>${val(money(h.amount), h.prov)}</b><span class="unit">${h.unit}</span>${others}</div></div>
+        <div class="figs">${time}<div class="num"><b>${val(money(h.amount), h.prov)}</b><span class="unit">${h.unit}</span>${others}</div></div></div>
       ${timeBar(r, longest)}
       <div class="meta">${metaHtml(r)}</div>
       ${costBar(r, priciest)}

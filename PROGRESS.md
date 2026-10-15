@@ -160,6 +160,27 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT extension — time up front + "least driving", human-reported):**
+  (1) **Time as prominent as price:** every option row now leads with door-to-door time
+  ("1 h 49 min", same size as the price) plus minutes driving and the round-trip time a day;
+  the meta line keeps the clock range. Under 480 px the name sits on its own line with time
+  and price side by side beneath it. (2) **"Minimize time spent driving" ranked driving
+  first.** Cause: `ParsedTrip.priority` only allowed cheapest/fastest, so qwen3:8b mapped it to
+  `fastest`, and driving all the way is fastest door to door. Added a **least_driving** sort
+  (the contract already listed it): ranks by minutes behind the wheel, then total time; badge
+  "Least driving"; it's a fourth ranking tab. Rules parser learns less-driving phrasing (checked
+  before "less time", so "minimize time spent driving" ≠ "minimize travel time"); the model's
+  prompt spells out the difference; a model "fastest" is overridden when the words say less
+  driving. **API v0.6.0** (sort_mode enum on TripSearchDraft + sort_options). Verified live: the
+  human's sentence (27 Eddington Ln, Monroe Township → Javits, "minimize time spent driving") now
+  reads "Least driving first" via qwen3:8b and ranks Princeton Jct. first (19 min driving) instead
+  of Drive (72 min); "fastest way …" still reads fastest. 375 px: no sideways scroll; no console
+  errors. ruff/mypy/pytest green (252); redocly lint passes. Files: `backend/app/trips/{models,
+  service}.py`, `backend/app/parsing/{models,rules,service}.py`, `backend/app/providers/ollama.py`,
+  `backend/app/web/index.html`, `docs/api-spec.yaml`, `backend/app/__init__.py`, tests
+  `test_trip_search.py`, `test_ai_parse.py`, `test_ollama_provider.py`. Requirements: F-06, F-07,
+  F-08, F-18, N-01.
+
 - **2026-10-14 — Claude (DEMO SPRINT extension — typed addresses kept failing, human-reported):**
   Root cause was matching, not OpenStreetMap: Nominatim returned the right results (e.g. exactly
   27 Eddington Lane, Monroe Township) and the resolver rejected them. (1) The last comma part was

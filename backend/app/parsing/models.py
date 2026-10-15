@@ -25,7 +25,9 @@ class ParsedTrip(BaseModel):
     origin_text: str | None = Field(default=None, max_length=200)
     """Where the trip starts, in the user's words (e.g. "Raritan")."""
     destination_text: str | None = Field(default=None, max_length=200)
-    priority: Literal["cheapest", "fastest"] | None = None
+    priority: Literal["cheapest", "fastest", "least_driving"] | None = None
+    """cheapest = lowest cost; fastest = least total door-to-door time; least_driving = least
+    time behind the wheel (park and take the train)."""
     leave_time: str | None = Field(default=None, pattern=HHMM)
     """24-hour local "HH:MM" the user wants to leave."""
     arrive_by_time: str | None = Field(default=None, pattern=HHMM)

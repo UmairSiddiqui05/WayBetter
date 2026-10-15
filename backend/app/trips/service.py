@@ -40,7 +40,7 @@ from app.trips.models import (
     TripSearchResponse,
 )
 
-SORT_OPTIONS = ["best_overall", "fastest", "cheapest"]
+SORT_OPTIONS = ["best_overall", "fastest", "cheapest", "least_driving"]
 
 
 class TripSearchError(ValueError):
@@ -881,7 +881,7 @@ class TripSearchService:
         """Sort keys per mode. An option with an unknown cost has only a partial total — a lower
         bound — so for cost-based modes it ranks after every option whose total is complete;
         a partial total can never win on price (N-02). Time is always known, so "fastest" is
-        unaffected."""
+        unaffected, and so is "least_driving" (minutes behind the wheel)."""
         complete = [o for o in options if o.complete_cost] or options
         min_cost = min((o.known_cost for o in complete), default=0) or 1.0
         min_time = min((o.route.total_minutes for o in options), default=0) or 1.0
@@ -897,6 +897,8 @@ class TripSearchService:
             "fastest": lambda o: (o.route.total_minutes, o.known_cost),
             "cheapest": lambda o: (partial(o), o.known_cost, o.route.total_minutes),
             "best_overall": lambda o: (partial(o), score(o), o.route.total_minutes),
+            # Minutes behind the wheel (drive times are always known), then door-to-door time.
+            "least_driving": lambda o: (o.route.drive_minutes, o.route.total_minutes),
         }
 
     @classmethod
@@ -916,6 +918,8 @@ class TripSearchService:
         badges: dict[str, list[str]] = {o.route.route_id: [] for o in ranked}
         badges[best.route.route_id].append("Best overall")
         badges[fastest.route.route_id].append("Fastest")
+        least_driving = min(ranked, key=keys["least_driving"])
+        badges[least_driving.route.route_id].append("Least driving")
         complete = [o for o in ranked if o.complete_cost]
         if complete:  # no "Cheapest" claim at all when every total is partial
             cheapest = min(complete, key=keys["cheapest"])

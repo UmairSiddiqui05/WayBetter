@@ -27,8 +27,13 @@ Rules:
 - origin_text / destination_text: copy the start and end places exactly as the user wrote
   them, including business names and towns ("Joe's Diner in Raritan"). Do not correct,
   complete, or replace them with another place. null if not stated.
-- priority: "cheapest" if they want to save money / go cheaply; "fastest" if they want speed;
-  otherwise null.
+- priority: one of
+  "cheapest" — they want to save money / spend as little as possible;
+  "least_driving" — they want to drive less: "minimize time spent driving", "drive as little
+    as possible", "I don't want to drive into the city", "less time behind the wheel";
+  "fastest" — they want the shortest TOTAL trip time door to door ("fastest", "quickest",
+    "least travel time") and say nothing about driving less;
+  otherwise null. "Minimize time spent driving" is least_driving, NOT fastest.
 - leave_time: when they want to leave, 24-hour "HH:MM". A bare morning hour like "7" is 07:00.
 - arrive_by_time: if they must arrive by a time ("by 9", "be there before 8:30"), 24-hour.
 - home_time: when they head home the same day, 24-hour; "home at 6" means 18:00.
