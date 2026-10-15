@@ -93,3 +93,6 @@ class PlaceLookupResponse(BaseModel):
     provenance: Provenance
     note: str | None
     clarifying_question: str | None
+    suggestions: list[str] = []
+    """v0.5.0. When the words fit several places (e.g. a street in three towns): each as text
+    the user can pick and send back. Empty otherwise."""

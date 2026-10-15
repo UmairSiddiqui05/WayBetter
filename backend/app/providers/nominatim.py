@@ -62,7 +62,7 @@ class NominatimGeocoder:
             "q": query.strip(),
             "format": "jsonv2",
             "addressdetails": 1,
-            "limit": 5,
+            "limit": 10,
             "countrycodes": "us",
             "viewbox": f"{min_lng},{max_lat},{max_lng},{min_lat}",
             "bounded": 1,
@@ -92,6 +92,7 @@ class NominatimGeocoder:
                     point=point,
                     kind=row.get("category") or row.get("class") or "",
                     address_line=line or None,
+                    road=address.get("road"),
                     localities=localities,
                 )
             )

@@ -365,3 +365,150 @@ def test_a_business_with_no_town_is_not_accepted(corridor: Corridor) -> None:
 
     assert out.missing_fields == ["destination"]
     assert out.clarifying_question and "What town" in out.clarifying_question
+
+
+# -- typed addresses: state/ZIP, big cities, choices (2026-10-14 live failures) -------------
+
+
+def _addr(
+    name: str,
+    road: str | None,
+    number: str | None,
+    town: str,
+    lat: float,
+    lng: float,
+    kind: str = "place",
+    localities: tuple[str, ...] = (),
+) -> GeocodeResult:
+    line = " ".join(p for p in (number, road) if p) or None
+    return GeocodeResult(
+        name=name or (line or ""),
+        town=town,
+        display_name=f"{line}, {town}",
+        point=LatLon(lat, lng),
+        kind=kind,
+        address_line=line,
+        road=road,
+        localities=localities or (town,),
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "parts"),
+    [
+        ("27 Eddington Ln, Monroe Township, NJ", ["27 Eddington Ln", "Monroe Township"]),
+        ("27 Eddington Lane, Monroe Township NJ 08831", ["27 Eddington Lane", "Monroe Township"]),
+        ("350 5th Ave, New York, NY", ["350 5th Ave", "New York"]),
+        ("Edison, NJ", ["Edison"]),
+        ("New Brunswick, New Jersey, USA", ["New Brunswick"]),
+    ],
+)
+def test_address_parts_drop_state_zip_and_country(text: str, parts: list[str]) -> None:
+    from app.parsing.places import address_parts
+
+    assert address_parts(text) == parts
+
+
+def test_a_trailing_state_is_not_mistaken_for_the_town(corridor: Corridor) -> None:
+    """Live: "27 Eddington Ln, Monroe Township, NJ" was found by OSM, then rejected because
+    "NJ" was compared as the town."""
+    house = _addr("", "Eddington Lane", "27", "Monroe Township", 40.2566, -74.4728)
+    geocoder = FakeGeocoder({"27 eddington ln, monroe township": [house]})
+    out = _service(corridor, geocoder).parse(
+        "from 27 Eddington Ln, Monroe Township, NJ to Times Square", NOW
+    )
+
+    assert out.missing_fields == []
+    assert out.draft.origin is not None and out.draft.origin.lat == 40.2566
+    origin = next(i for i in out.interpretation if i.field == "origin")
+    assert origin.provenance is Provenance.AI_GENERATED
+    assert "town center" not in origin.value_label  # a house is not an area
+
+
+def test_new_york_as_a_town_still_matches(corridor: Corridor) -> None:
+    hit = _addr(
+        "Empire State Building", "5th Avenue", "350", "New York", 40.7484, -73.9857,
+        kind="tourism", localities=("Manhattan", "New York"),
+    )  # fmt: skip
+    geocoder = FakeGeocoder({"350 5th ave, new york": [hit]})
+
+    out = _service(corridor, geocoder).parse("from Princeton to 350 5th Ave, New York, NY", NOW)
+
+    assert out.draft.destination is not None and out.draft.destination.lat == 40.7484
+
+
+def test_a_town_with_its_state_is_the_town_center(corridor: Corridor) -> None:
+    town = GeocodeResult(
+        name="Monroe Township",
+        town="Monroe Township",
+        display_name="Monroe Township, Middlesex County, New Jersey",
+        point=LatLon(40.3358, -74.4334),
+        kind="boundary",
+    )
+    geocoder = FakeGeocoder({"monroe township": [town]})
+    lookup = _service(corridor, geocoder).lookup_place("Monroe Township, New Jersey", "origin")
+
+    assert lookup.place is not None and lookup.place.lat == 40.3358
+    assert lookup.value_label == "Monroe Township (town center)"
+
+
+def test_a_street_in_several_towns_offers_choices_and_picks_none(corridor: Corridor) -> None:
+    geocoder = FakeGeocoder(
+        {
+            "nassau street": [
+                _addr(
+                    "Nassau Street", "Nassau Street", None, "Princeton", 40.35, -74.65, "highway"
+                ),
+                _addr("Nassau Street", "Nassau Street", None, "New York", 40.71, -74.01, "highway"),
+            ]
+        }
+    )
+    lookup = _service(corridor, geocoder).lookup_place("Nassau Street", "origin")
+
+    assert lookup.place is None
+    assert lookup.suggestions == ["Nassau Street, Princeton", "Nassau Street, New York"]
+    assert lookup.clarifying_question and "Princeton" in lookup.clarifying_question
+
+
+def test_a_name_in_only_one_town_is_used(corridor: Corridor) -> None:
+    hit = _addr("Rockefeller Center", None, None, "New York", 40.7593, -73.98, "tourism")
+    geocoder = FakeGeocoder({"rockefeller center": [hit]})
+
+    lookup = _service(corridor, geocoder).lookup_place("Rockefeller Center", "destination")
+
+    assert lookup.place is not None and lookup.place.lat == 40.7593
+
+
+def test_unmatched_house_number_offers_streets_but_uses_the_town_center(
+    corridor: Corridor,
+) -> None:
+    """Live: "75 Main St, Somerville" is 75 East or 75 West Main St. Offer both; pick neither."""
+    town = GeocodeResult(
+        name="Somerville",
+        town="Somerville",
+        display_name="Somerville, Somerset County, New Jersey",
+        point=LatLon(40.5743, -74.6099),
+        kind="boundary",
+    )
+    geocoder = FakeGeocoder(
+        {
+            "main st, somerville": [
+                _addr("East Main Street", "East Main Street", None, "Somerville", 40.5, -74.6),
+                _addr("West Main Street", "West Main Street", None, "Somerville", 40.6, -74.6),
+            ],
+            "somerville": [town],
+        }
+    )  # fmt: skip
+    lookup = _service(corridor, geocoder).lookup_place("75 Main St, Somerville NJ", "origin")
+
+    assert lookup.place is not None and lookup.place.lat == 40.5743  # town center, approximate
+    assert lookup.provenance is Provenance.ESTIMATED
+    assert lookup.suggestions == [
+        "75 East Main Street, Somerville",
+        "75 West Main Street, Somerville",
+    ]
+
+
+def test_number_words_match_digits() -> None:
+    assert names_agree("One World Trade Center", "1 World Trade Center")
+    assert names_agree("5th Avenue", "Fifth Avenue")

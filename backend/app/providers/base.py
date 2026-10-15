@@ -92,6 +92,8 @@ class GeocodeResult:
     """Geocoder category, e.g. "amenity", "place", "boundary", "building"."""
     address_line: str | None = None
     """"<number> <street>" when known ("429 11th Avenue"), even for a named feature."""
+    road: str | None = None
+    """The street, when the result has one ("Eddington Lane")."""
     localities: tuple[str, ...] = ()
     """Every place name in the address (town, city, borough, suburb...): "Manhattan" and
     "New York" both describe 429 11th Ave."""

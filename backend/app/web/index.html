@@ -76,6 +76,8 @@
   .place-note { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin-top: 2px; }
   .place-note:empty { display: none; }
   .place-note .u-q { margin-top: 4px; padding: 6px 8px; font-size: 12px; }
+  .choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .choices .chip { font-size: 12px; text-align: left; }
   .route-fields { display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px; gap: 0 8px; align-items: center; }
   .route-rail { display: grid; justify-items: center; align-self: stretch; padding: 18px 0; }
   .route-rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
@@ -868,8 +870,10 @@ async function resolveField(which) {
   if (r.status === 401) { session = null; r = await post(); }
   const data = await r.json();
   if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid place") : `HTTP ${r.status}`);
-  const q = data.clarifying_question
-    ? `<div class="u-q ${data.place ? "" : "need"}">${ic("circle-help", "sm")}<span>${esc(data.clarifying_question)}</span></div>` : "";
+  const q = (data.clarifying_question
+    ? `<div class="u-q ${data.place ? "" : "need"}">${ic("circle-help", "sm")}<span>${esc(data.clarifying_question)}</span></div>` : "")
+    + ((data.suggestions || []).length ? `<div class="choices">${data.suggestions.map((t) =>
+      `<button type="button" class="chip" data-choose="${which}" data-text="${esc(t)}">${ic("map-pin", "sm")}${esc(t)}</button>`).join("")}</div>` : "");
   const how = `${askVal(esc(data.value_label), data.provenance)} ${word(data.provenance)}${data.note ? ` · ${esc(data.note)}` : ""}`;
   if (!data.place) { note.innerHTML = how + q; return null; }
   const id = `typed-${which}`;
@@ -919,6 +923,14 @@ async function search() {
   }
 }
 $("form").addEventListener("submit", (e) => { e.preventDefault(); setPeriod("trip"); search(); });
+// A place the server offered as a choice (e.g. "Nassau Street, Princeton"): use it and compare.
+$("form").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-choose]");
+  if (!b) return;
+  const which = b.dataset.choose;
+  $(which).value = b.dataset.text; chosen[which] = null; $(`${which}-note`).innerHTML = "";
+  setPeriod("trip"); search();
+});
 
 // ---- Plain words (POST /trip/ai-parse) --------------------------------------------------------
 // The server reads the words, resolves the places and fills a draft request; the page shows its

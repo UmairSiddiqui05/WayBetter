@@ -160,6 +160,28 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT extension — typed addresses kept failing, human-reported):**
+  Root cause was matching, not OpenStreetMap: Nominatim returned the right results (e.g. exactly
+  27 Eddington Lane, Monroe Township) and the resolver rejected them. (1) The last comma part was
+  taken as the town, so a trailing "NJ" / "New Jersey" became the "town" and never matched; now
+  trailing state / ZIP / country parts are dropped first (`address_parts`; spelled-out "New York"
+  stays a town). (2) Town comparison stripped state words, which left nothing of "New York";
+  now it only strips when something remains. (3) OSM files a plain house address under category
+  "place", so addresses were labelled "(town center)"; areas now need no street. (4) "one" = "1",
+  "fifth" = "5th" (One World Trade Center). New, using more of what OSM returns (limit 10):
+  a name with no town is used when it exists in only one town of the region (Rockefeller Center,
+  Grand Central); when it exists in several, the lookup offers them as **choices**
+  (`suggestions`, API **v0.5.0**, additive) and picks none ("Nassau Street" → New York or
+  Princeton); an unmatched house number offers the matching streets with the number ("75 Main St,
+  Somerville" → 75 East / 75 West Main Street) while using the town center, approximate. A street
+  point is never used for a missing number: Nominatim returns long avenues as one short piece
+  (5th Avenue came back in Harlem for "1 Fifth Avenue"). Page: choices render as buttons under
+  the field; clicking one fills it and compares. Verified live (port 8000 + browser): the human's
+  failing inputs now resolve; Nassau Street → pick Princeton → compares. ruff/mypy/pytest green
+  (243); redocly lint passes. Files: `backend/app/parsing/{places,models,service}.py`,
+  `backend/app/providers/{base,nominatim}.py`, `backend/app/web/index.html`, `docs/api-spec.yaml`,
+  `backend/app/__init__.py`, `backend/tests/test_geocoding.py`. Requirements: F-08, N-02, N-04.
+
 - **2026-10-14 — Claude (CI fix):** CI `docs` job (redocly lint) failed on push `5a64f74`: four
   `description:` values added in v0.3.0/v0.4.0 sat unquoted inside YAML flow mappings, so their
   commas split them into stray keys (5 `struct` errors). Quoted them; `redocly lint` passes

@@ -179,6 +179,7 @@ class TripParseService:
             provenance=res.provenance,
             note=res.note,
             clarifying_question=res.question,
+            suggestions=list(res.suggestions),
         )
 
     def warm_up(self) -> None:
