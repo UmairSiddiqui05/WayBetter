@@ -16,6 +16,7 @@ from app.regions.loader import REPO_ROOT
 from app.trips.corridor import load_corridor
 from app.trips.factory import get_trip_service
 from app.trips.models import (
+    MoneyEstimate,
     Provenance,
     RoundTrip,
     RouteOption,
@@ -67,6 +68,9 @@ class FakeDriving:
             return DriveRoute(78 * 60, 45000, "", steps)
         return DriveRoute(30 * 60, 32000, "", ())
 
+    def route_options(self, origin: LatLon, destination: LatLon) -> tuple[DriveRoute, ...]:
+        return (self.route(origin, destination),)
+
 
 class FakeTransit:
     def next_trip(self, from_station: str, to_station: str, depart_after: datetime) -> TransitTrip:
@@ -115,6 +119,10 @@ def request(**overrides: object) -> TripSearchRequest:
 NOW = datetime(2026, 10, 14, 20, 0, tzinfo=NY)
 
 
+def badges(route: RouteOption) -> set[str]:
+    return {b.id for b in route.badges}
+
+
 def test_compares_driving_with_every_park_and_ride_lot(service: TripSearchService) -> None:
     response = service.search(request(), NOW)
 
@@ -147,14 +155,21 @@ def test_cheapest_sort_orders_by_total_cost(service: TripSearchService) -> None:
 
     totals = [r.cost_breakdown.total for r in routes]
     assert totals == sorted(totals)
-    assert routes[0].label and "Cheapest" in routes[0].label
+    assert "cheapest" in badges(routes[0])
+    assert [b.text for b in routes[0].badges if b.id == "cheapest"] == ["Cheapest"]
 
 
-def test_fastest_label_goes_to_the_quickest_option(service: TripSearchService) -> None:
+def test_badges_go_to_unique_winners_only(service: TripSearchService) -> None:
+    """The fakes give every park-and-ride the same 30-min drive: a tie for least driving, so no
+    one gets that badge, while driving all the way is the one fastest option."""
     routes = service.search(request(), NOW).routes
-    quickest = min(routes, key=lambda r: r.total_minutes)
+    drive = next(r for r in routes if r.route_id == "drive")
+    pnr_drives = {round(r.drive_minutes) for r in routes if r.route_id != "drive"}
 
-    assert quickest.label and "Fastest" in quickest.label
+    assert "fastest" in badges(drive)
+    assert len(pnr_drives) == 1
+    assert not any("least_driving" in badges(r) for r in routes)
+    assert not any("most_driving" in badges(r) for r in routes)  # a sort tab, never a badge
 
 
 def test_unknown_destination_parking_is_flagged_not_invented(service: TripSearchService) -> None:
@@ -437,13 +452,23 @@ def test_api_returns_the_round_trip_and_validates_return_time(
 
 
 def _opt(
-    route_id: str, cost: float, minutes: float, complete: bool, drive: float | None = None
+    route_id: str,
+    cost: float,
+    minutes: float,
+    complete: bool,
+    drive: float | None = None,
+    transfers: int = 0,
+    co2: float | None = None,
 ) -> _Option:
     route = RouteOption.model_construct(
         route_id=route_id,
         total_minutes=minutes,
         drive_minutes=minutes if drive is None else drive,
-        label=None,
+        transfer_count=transfers,
+        emissions_kg=MoneyEstimate(
+            amount=co2, provenance=Provenance.ESTIMATED if co2 is not None else Provenance.UNKNOWN
+        ),
+        badges=[],
         round_trip=None,
         explanation=None,
     )
@@ -466,19 +491,19 @@ def test_a_partial_total_never_wins_on_price() -> None:
     assert TripSearchService._rank(options, "best_overall")[0] is metro
     assert TripSearchService._rank(options, "fastest")[0] is drive  # time is known
 
-    TripSearchService._label_and_explain(TripSearchService._rank(options, "best_overall"))
-    assert metro.route.label == "Best overall · Cheapest"
-    assert drive.route.label == "Fastest"
-    assert hamilton.route.label == "Least driving"
+    TripSearchService._badge_and_explain(TripSearchService._rank(options, "best_overall"))
+    assert [b.text for b in metro.route.badges] == ["Best overall", "Cheapest"]
+    assert badges(drive.route) == {"fastest"}
+    assert badges(hamilton.route) == {"least_driving"}
     assert "ranks after options whose costs are all known" in drive.route.explanation.text
 
 
 def test_no_cheapest_badge_when_every_total_is_partial() -> None:
     a, b = _opt("a", 10.0, 50, complete=False), _opt("b", 12.0, 40, complete=False)
 
-    TripSearchService._label_and_explain(TripSearchService._rank([a, b], "cheapest"))
+    TripSearchService._badge_and_explain(TripSearchService._rank([a, b], "cheapest"))
 
-    assert "Cheapest" not in f"{a.route.label} {b.route.label}"
+    assert "cheapest" not in badges(a.route) | badges(b.route)
 
 
 def test_search_to_an_unverified_destination_ranks_complete_costs_first(
@@ -495,7 +520,7 @@ def test_search_to_an_unverified_destination_ranks_complete_costs_first(
         assert partial == sorted(partial)  # every complete total before any partial one
         for r, is_partial in zip(routes, partial, strict=True):
             if is_partial:
-                assert "Cheapest" not in (r.label or "") and "Best overall" not in (r.label or "")
+                assert not badges(r) & {"cheapest", "best_overall"}
 
 
 def test_least_driving_ranks_by_minutes_behind_the_wheel() -> None:
@@ -508,9 +533,9 @@ def test_least_driving_ranks_by_minutes_behind_the_wheel() -> None:
     ranked = TripSearchService._rank([drive, metro, near], "least_driving")
 
     assert [o.route.route_id for o in ranked] == ["pnr-new-brunswick", "pnr-metropark", "drive"]
-    TripSearchService._label_and_explain(ranked)
-    assert "Least driving" in (near.route.label or "")
-    assert "Fastest" in (drive.route.label or "")
+    TripSearchService._badge_and_explain(ranked)
+    assert "least_driving" in badges(near.route)
+    assert "fastest" in badges(drive.route)
 
 
 def test_least_driving_is_offered_as_a_sort(service: TripSearchService) -> None:

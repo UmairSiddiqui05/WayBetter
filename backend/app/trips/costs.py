@@ -14,6 +14,7 @@ from app.pricing.models import (
     BarrierToll,
     CrossingToll,
     DataStatus,
+    EmissionFactors,
     PeakWindows,
     TicketToll,
     VehicleDefaults,
@@ -32,8 +33,16 @@ def provenance_of(status: DataStatus) -> Provenance:
 
 
 def worst(*values: Provenance) -> Provenance:
-    """Unknown beats estimated beats scheduled: a sum is only as good as its weakest part."""
-    order = [Provenance.UNKNOWN, Provenance.ESTIMATED, Provenance.SCHEDULED]
+    """A sum is only as good as its weakest part: unknown, then AI-generated, then the user's own
+    value, then estimated, then live, then scheduled."""
+    order = [
+        Provenance.UNKNOWN,
+        Provenance.AI_GENERATED,
+        Provenance.USER_REPORTED,
+        Provenance.ESTIMATED,
+        Provenance.LIVE,
+        Provenance.SCHEDULED,
+    ]
     return next((p for p in order if p in values), Provenance.SCHEDULED)
 
 
@@ -43,16 +52,103 @@ def in_peak(at: datetime, windows: PeakWindows) -> bool:
     return any(start <= hhmm < end for start, end in spans)
 
 
-def fuel_cost(distance_m: float, vehicle: VehicleDefaults) -> MoneyEstimate:
+YOUR_VALUE = "your value"
+
+
+@dataclass(frozen=True)
+class Fuel:
+    """The fuel economy and gas price one request uses: the user's own values when sent
+    (user_reported), else the data-file averages (F-14)."""
+
+    mpg: float
+    mpg_status: Provenance
+    usd_per_gallon: float
+    price_status: Provenance
+
+    def _tag(self, status: Provenance) -> str:
+        return f" ({YOUR_VALUE})" if status is Provenance.USER_REPORTED else ""
+
+    @property
+    def mpg_text(self) -> str:
+        return f"{self.mpg:g} mpg{self._tag(self.mpg_status)}"
+
+    @property
+    def price_text(self) -> str:
+        return f"${self.usd_per_gallon:.3f}/gal{self._tag(self.price_status)}"
+
+
+def fuel_inputs(
+    vehicle: VehicleDefaults, mpg: float | None = None, usd_per_gallon: float | None = None
+) -> Fuel:
+    user = Provenance.USER_REPORTED
+    return Fuel(
+        mpg=mpg if mpg is not None else vehicle.fuel_economy.mpg,
+        mpg_status=user if mpg is not None else provenance_of(vehicle.fuel_economy.status),
+        usd_per_gallon=usd_per_gallon
+        if usd_per_gallon is not None
+        else vehicle.gasoline.usd_per_gallon,
+        price_status=user if usd_per_gallon is not None else provenance_of(vehicle.gasoline.status),
+    )
+
+
+def fuel_cost(distance_m: float, fuel: VehicleDefaults | Fuel) -> MoneyEstimate:
+    if isinstance(fuel, VehicleDefaults):
+        fuel = fuel_inputs(fuel)
     miles = distance_m / METERS_PER_MILE
-    gallons = miles / vehicle.fuel_economy.mpg
-    price = vehicle.gasoline.usd_per_gallon
+    gallons = miles / fuel.mpg
     return MoneyEstimate(
-        amount=round(gallons * price, 2),
-        provenance=worst(
-            provenance_of(vehicle.gasoline.status), provenance_of(vehicle.fuel_economy.status)
-        ),
-        note=f"{miles:.1f} mi at {vehicle.fuel_economy.mpg:g} mpg x ${price:.3f}/gal",
+        amount=round(gallons * fuel.usd_per_gallon, 2),
+        provenance=worst(fuel.price_status, fuel.mpg_status),
+        note=f"{miles:.1f} mi at {fuel.mpg_text} x {fuel.price_text}",
+    )
+
+
+@dataclass(frozen=True)
+class Co2Part:
+    """One leg's share of a trip's CO2: what was multiplied, and the result."""
+
+    kg: float | None
+    provenance: Provenance
+    note: str
+
+
+def car_co2(miles: float, fuel: Fuel, factors: EmissionFactors | None) -> Co2Part:
+    if factors is None:
+        return Co2Part(None, Provenance.UNKNOWN, "Drive: no CO2 factor in data")
+    g = factors.gasoline
+    gallons = miles / fuel.mpg
+    return Co2Part(
+        round(gallons * g.kg_co2_per_gallon, 2),
+        worst(provenance_of(g.status), fuel.mpg_status),
+        f"Drive {miles:.1f} mi at {fuel.mpg_text} x {g.kg_co2_per_gallon:g} kg/gal",
+    )
+
+
+def transit_co2(
+    miles: float | None, modes: tuple[str, ...], what: str, factors: EmissionFactors | None
+) -> Co2Part:
+    factor = factors.transit_factor(modes) if factors else None
+    if factor is None:
+        return Co2Part(None, Provenance.UNKNOWN, f"{what}: no CO2 factor in data")
+    if miles is None:
+        return Co2Part(None, Provenance.UNKNOWN, f"{what}: distance ridden unknown")
+    rate = factor.kg_co2_per_passenger_mile
+    return Co2Part(
+        round(miles * rate, 2),
+        provenance_of(factor.status),
+        f"{what} {miles:.1f} mi x {rate:g} kg per passenger-mile",
+    )
+
+
+def co2_total(parts: list[Co2Part]) -> MoneyEstimate:
+    """The trip's CO2 in kg (MoneyEstimate's amount is kg here). Unknown if any part is."""
+    notes = "; ".join(p.note for p in parts) or "No driving or transit legs"
+    if any(p.kg is None for p in parts):
+        return MoneyEstimate(amount=None, provenance=Provenance.UNKNOWN, note=notes)
+    return MoneyEstimate(
+        amount=round(sum(p.kg or 0.0 for p in parts), 1),
+        provenance=worst(*(p.provenance for p in parts)) if parts else Provenance.ESTIMATED,
+        note=notes,
     )
 
 

@@ -56,6 +56,11 @@ class TransitTrip:
 class DrivingProvider(Protocol):
     def route(self, origin: LatLon, destination: LatLon) -> DriveRoute: ...
 
+    def route_options(self, origin: LatLon, destination: LatLon) -> tuple[DriveRoute, ...]:
+        """The fastest route first, then any alternatives the provider offers. Used to look for
+        a toll-free route when the provider cannot exclude tolls itself (D-21)."""
+        ...
+
 
 class TransitProvider(Protocol):
     def next_trip(

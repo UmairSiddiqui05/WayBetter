@@ -6,12 +6,14 @@ Flow per request:
      next scheduled train to the hub, then walk or subway to the destination.
   3. The daily commute: each option's evening trip home at the return time, then daily,
      monthly and annual costs (once-a-day charges counted once) and savings versus driving.
-  4. Rank on the morning trip, label the winners, and explain from the computed numbers.
+  4. Apply the filters (avoid tolls, max walk), listing every hidden option with its reasons.
+  5. Rank the rest on the morning trip, badge each unique winner, and explain from the numbers.
 All of it is server-side; the client only renders this payload (N-01).
 """
 
 from __future__ import annotations
 
+import itertools
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,17 +21,23 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.pricing import DataStatus, PricingData
-from app.pricing.models import ParkingLot, RailFares, StationFare, VehicleDefaults
+from app.pricing.models import EmissionFactors, ParkingLot, RailFares, StationFare, VehicleDefaults
 from app.providers.base import DriveRoute, DrivingProvider, LatLon, ProviderError, TransitProvider
+from app.providers.polyline import decode
 from app.regions.schema import RegionConfig
 from app.trips import costs
 from app.trips.corridor import Corridor, Place, haversine_m
 from app.trips.models import (
+    Badge,
+    BadgeId,
     CostBreakdown,
     Explanation,
+    FilteredRoute,
     LatLng,
+    MapLink,
     MoneyEstimate,
     ParkingFacility,
+    Preferences,
     Provenance,
     RoundTrip,
     RouteLeg,
@@ -40,7 +48,24 @@ from app.trips.models import (
     TripSearchResponse,
 )
 
-SORT_OPTIONS = ["best_overall", "fastest", "cheapest", "least_driving"]
+SORT_OPTIONS = [
+    "best_overall",
+    "fastest",
+    "cheapest",
+    "least_driving",
+    "most_driving",
+    "fewest_transfers",
+    "cleanest",
+]
+BADGE_TEXT: dict[BadgeId, str] = {
+    "best_overall": "Best overall",
+    "fastest": "Fastest",
+    "cheapest": "Cheapest",
+    "least_driving": "Least driving",
+    "fewest_transfers": "Fewest transfers",
+    "cleanest": "Cleanest",
+}
+"""Most driving is a sort tab only: driving the most is not something to award."""
 
 
 class TripSearchError(ValueError):
@@ -59,6 +84,31 @@ class _Option:
     route: RouteOption
     known_cost: float
     complete_cost: bool
+
+    @property
+    def co2(self) -> float | None:
+        return self.route.emissions_kg.amount
+
+
+@dataclass(frozen=True)
+class _Context:
+    """What one request changes about costing: toll payment, fuel inputs, toll avoidance."""
+
+    payment: str
+    fuel: costs.Fuel
+    avoid_tolls: bool
+
+
+@dataclass(frozen=True)
+class _Drive:
+    """A driving route chosen for a leg, with its tolls priced."""
+
+    route: DriveRoute
+    tolls: MoneyEstimate
+    facilities: set[str]
+    unknown_tolls: list[str]
+    note: str | None
+    """Set when a toll-free alternative replaced the fastest route."""
 
 
 @dataclass(frozen=True)
@@ -85,6 +135,15 @@ def _clock(at: datetime) -> str:
 
 def _money(est: MoneyEstimate) -> str:
     return "unknown" if est.amount is None else f"${est.amount:,.2f}"
+
+
+def _polyline_miles(polyline: str | None) -> float | None:
+    """Length of an encoded polyline, or None without one (distance then stays unknown)."""
+    points = decode(polyline) if polyline else []
+    if len(points) < 2:
+        return None
+    meters = sum(haversine_m(a, b) for a, b in itertools.pairwise(points))
+    return round(meters / costs.METERS_PER_MILE, 1)
 
 
 def _free(note: str) -> MoneyEstimate:
@@ -214,14 +273,19 @@ class TripSearchService:
             depart = depart.replace(tzinfo=self._tz)
         depart = depart.astimezone(self._tz)
         return_at = self._return_at(depart, request.return_time)
-        payment = request.vehicle_profile.toll_payment
+        profile, prefs = request.vehicle_profile, request.preferences
+        ctx = _Context(
+            payment=profile.toll_payment,
+            fuel=costs.fuel_inputs(self._vehicle(), profile.mpg, profile.fuel_price_per_gallon),
+            avoid_tolls=prefs.avoid_tolls,
+        )
         dest_place = self._corridor.place_near(destination)
 
         options: list[_Option] = []
         warnings_global: list[str] = []
         try:
             options.append(
-                self._drive_all_the_way(origin, destination, dest_place, depart, return_at, payment)
+                self._drive_all_the_way(origin, destination, dest_place, depart, return_at, ctx)
             )
         except ProviderError as exc:
             warnings_global.append(f"Driving baseline unavailable: {exc}")
@@ -229,7 +293,7 @@ class TripSearchService:
             for lot in group.lots:
                 try:
                     option = self._park_and_ride(
-                        lot, origin, destination, dest_place, depart, return_at, payment
+                        lot, origin, destination, dest_place, depart, return_at, ctx
                     )
                 except ProviderError as exc:
                     warnings_global.append(f"{lot.name}: {exc}")
@@ -238,11 +302,13 @@ class TripSearchService:
                     options.append(option)
 
         self._add_savings(options)
-        ranked = self._rank(options, request.preferences.sort_mode)
-        self._label_and_explain(ranked)
+        kept, hidden = self._filter(options, prefs)
+        ranked = self._rank(kept, prefs.sort_mode)
+        self._badge_and_explain(ranked)
         return TripSearchResponse(
             request_id=str(uuid.uuid4()),
             routes=[o.route for o in ranked],
+            filtered_out=hidden,
             sort_options=SORT_OPTIONS,
             disclaimers=self._disclaimers() + warnings_global,
         )
@@ -261,6 +327,47 @@ class TripSearchService:
 
     def _vehicle(self) -> VehicleDefaults:
         return self._pricing.vehicle_defaults[0]
+
+    def _emission_factors(self) -> EmissionFactors | None:
+        return self._pricing.emission_factors[0] if self._pricing.emission_factors else None
+
+    def _modes(self, feed_id: str) -> tuple[str, ...]:
+        """A feed's transit modes from the region config: what picks its CO2 factor (N-03)."""
+        feed = next((f for f in self._region.feeds if f.feed_id == feed_id), None)
+        return tuple(m.value for m in feed.modes) if feed else ()
+
+    def _map_links(self, start: LatLon, end: LatLon) -> list[MapLink]:
+        return [
+            MapLink(
+                app_id=h.app_id, label=h.label, url=h.url(start.lat, start.lon, end.lat, end.lon)
+            )
+            for h in self._region.map_handoff
+        ]
+
+    def _drive(
+        self, origin: LatLon, destination: LatLon, depart: datetime, ctx: _Context
+    ) -> _Drive:
+        """The provider's fastest route — or, when avoiding tolls, the first route it offers that
+        our toll files price at $0. With none, the fastest stays and the filter hides the option."""
+        if not ctx.avoid_tolls:
+            route = self._driving.route(origin, destination)
+            return _Drive(route, *self._tolls(route, depart, ctx.payment), note=None)
+        priced = [
+            _Drive(r, *self._tolls(r, depart, ctx.payment), note=None)
+            for r in self._driving.route_options(origin, destination)
+        ]
+        if not priced:
+            raise ProviderError("no route")
+        fastest = priced[0]
+        free = next((d for d in priced if d.tolls.amount == 0 and not d.unknown_tolls), None)
+        if free is None or free is fastest:
+            return fastest
+        extra = (free.route.duration_s - fastest.route.duration_s) / 60
+        note = (
+            f"Avoiding tolls: a toll-free route ({extra:+.0f} min versus the fastest, which pays "
+            f"{_money(fastest.tolls)})"
+        )
+        return _Drive(free.route, free.tolls, free.facilities, free.unknown_tolls, note)
 
     def _tolls(
         self, route: DriveRoute, depart: datetime, payment: str
@@ -303,18 +410,23 @@ class TripSearchService:
         dest_place: Place | None,
         depart: datetime,
         return_at: datetime,
-        payment: str,
+        ctx: _Context,
     ) -> _Option:
-        route = self._driving.route(origin, destination)
+        chosen = self._drive(origin, destination, depart, ctx)
+        route, tolls, facilities, unknown_tolls = (
+            chosen.route,
+            chosen.tolls,
+            chosen.facilities,
+            chosen.unknown_tolls,
+        )
         arrive = depart + timedelta(seconds=route.duration_s)
-        fuel = costs.fuel_cost(route.distance_m, self._vehicle())
-        tolls, facilities, unknown_tolls = self._tolls(route, depart, payment)
+        fuel = costs.fuel_cost(route.distance_m, ctx.fuel)
         zone = costs.zone_toll(
             self._pricing.zone_tolls[0],
             dest_place.in_congestion_relief_zone if dest_place else None,
             arrive,
             facilities,
-            payment,
+            ctx.payment,
         )
         parking = self._destination_parking(dest_place)
         none = MoneyEstimate(amount=0.0, provenance=Provenance.SCHEDULED, note="No transit")
@@ -338,21 +450,24 @@ class TripSearchService:
             distance_miles=round(miles, 1),
             polyline=route.polyline,
             time_provenance=Provenance.ESTIMATED,
+            map_links=self._map_links(origin, destination),
         )
         warnings = self._unknown_warnings(breakdown) + [
             f"Toll not priced: {n}" for n in unknown_tolls
         ]
+        if chosen.note:
+            warnings.append(chosen.note)
         warnings.append("Drive time is free-flow (no live traffic); rush hour is usually slower.")
         round_trip = None
         try:
-            evening = self._drive_home(origin, destination, max(return_at, arrive), payment)
+            evening = self._drive_home(origin, destination, max(return_at, arrive), ctx)
             round_trip = self._round_trip(evening, breakdown, leg.duration_minutes, None)
             warnings += evening.warnings
         except ProviderError as exc:
             warnings.append(f"Trip home unavailable: {exc}")
         option = RouteOption(
             route_id="drive",
-            label=None,
+            badges=[],
             summary="Drive all the way",
             total_minutes=leg.duration_minutes,
             drive_minutes=leg.duration_minutes,
@@ -362,6 +477,9 @@ class TripSearchService:
             drive_miles=round(miles, 1),
             transfer_count=0,
             cost_breakdown=breakdown,
+            emissions_kg=costs.co2_total(
+                [costs.car_co2(miles, ctx.fuel, self._emission_factors())]
+            ),
             parking=None,
             warnings=warnings,
             explanation=Explanation(text="", provenance=Provenance.ESTIMATED),
@@ -373,14 +491,14 @@ class TripSearchService:
         )
 
     def _drive_home(
-        self, origin: LatLon, destination: LatLon, leave: datetime, payment: str
+        self, origin: LatLon, destination: LatLon, leave: datetime, ctx: _Context
     ) -> _Evening:
-        route = self._driving.route(destination, origin)
+        chosen = self._drive(destination, origin, leave, ctx)
+        route, tolls, unknown_tolls = chosen.route, chosen.tolls, chosen.unknown_tolls
         home = leave + timedelta(seconds=route.duration_s)
-        tolls, _, unknown_tolls = self._tolls(route, leave, payment)
         zone = self._pricing.zone_tolls[0]
         evening = _breakdown(
-            costs.fuel_cost(route.distance_m, self._vehicle()),
+            costs.fuel_cost(route.distance_m, ctx.fuel),
             _free("Day rate, already paid on the morning trip"),
             _free("No transit"),
             tolls,
@@ -401,12 +519,14 @@ class TripSearchService:
             distance_miles=round(route.distance_m / costs.METERS_PER_MILE, 1),
             polyline=route.polyline,
             time_provenance=Provenance.ESTIMATED,
+            map_links=self._map_links(destination, origin),
         )
         return _Evening(
             summary=f"Leave {_clock(leave)}, drive home, arrive {_clock(home)}",
             legs=[leg],
             costs=evening,
-            warnings=self._home_warnings(evening, unknown_tolls),
+            warnings=self._home_warnings(evening, unknown_tolls)
+            + ([f"Trip home: {chosen.note}"] if chosen.note else []),
         )
 
     def _home_warnings(self, evening: CostBreakdown, unknown_tolls: list[str]) -> list[str]:
@@ -519,13 +639,14 @@ class TripSearchService:
         dest_place: Place | None,
         depart: datetime,
         return_at: datetime,
-        payment: str,
+        ctx: _Context,
     ) -> _Option | None:
         station = self._stations.get(lot.station)
         hub = self._stations.get(self._corridor.hub_station)
         if not station or not hub:
             return None
-        drive = self._driving.route(origin, station.point)
+        chosen = self._drive(origin, station.point, depart, ctx)
+        drive, tolls, unknown_tolls = chosen.route, chosen.tolls, chosen.unknown_tolls
         at_lot = depart + timedelta(seconds=drive.duration_s)
         on_platform = at_lot + timedelta(minutes=self._region.default_parking_buffer_minutes)
         trip = self._transit.next_trip(lot.station, self._corridor.hub_station, on_platform)
@@ -545,6 +666,7 @@ class TripSearchService:
                 distance_miles=round(drive_miles, 1),
                 polyline=drive.polyline,
                 time_provenance=Provenance.ESTIMATED,
+                map_links=self._map_links(origin, station.point),
             )
         )
         legs.append(
@@ -559,6 +681,7 @@ class TripSearchService:
                 time_provenance=Provenance.ESTIMATED,
             )
         )
+        rail_line = self._transit.trip_polyline(trip)
         legs.append(
             RouteLeg(
                 leg_id="transit-1",
@@ -568,18 +691,18 @@ class TripSearchService:
                 start_time=trip.departure,
                 end_time=trip.arrival,
                 duration_minutes=_minutes(trip.arrival - trip.departure),
+                distance_miles=_polyline_miles(rail_line),
                 agency=trip.agency,
                 route_name=trip.route_name,
                 headsign=trip.headsign,
-                polyline=self._transit.trip_polyline(trip),
+                polyline=rail_line,
                 time_provenance=Provenance.SCHEDULED,
             )
         )
         last_leg, subway_fare = self._last_mile(hub, destination, trip.arrival)
         legs.append(last_leg)
 
-        fuel = costs.fuel_cost(drive.distance_m, self._vehicle())
-        tolls, _, unknown_tolls = self._tolls(drive, depart, payment)
+        fuel = costs.fuel_cost(drive.distance_m, ctx.fuel)
         parking_cost = lot.daily_cost(self._corridor.assumed_parking_hours)
         parking = MoneyEstimate(
             amount=parking_cost,
@@ -611,6 +734,8 @@ class TripSearchService:
         warnings = self._unknown_warnings(breakdown) + [
             f"Toll not priced: {n}" for n in unknown_tolls
         ]
+        if chosen.note:
+            warnings.append(chosen.note)
         if lot.status is DataStatus.ESTIMATED:
             warnings.append(f"{lot.name} price is an estimate: {lot.source.notes or ''}".strip())
         round_trip = None
@@ -624,7 +749,7 @@ class TripSearchService:
                 max(return_at, last_leg.end_time),
                 at_lot,
                 parking,
-                payment,
+                ctx,
             )
             if evening is None:
                 warnings.append(
@@ -640,7 +765,7 @@ class TripSearchService:
             warnings.append(f"Trip home unavailable: {exc}")
         option = RouteOption(
             route_id=f"pnr-{lot.lot_id}",
-            label=None,
+            badges=[],
             summary=f"Park at {station.name.title()}, train to {hub.name.title()}",
             total_minutes=total,
             drive_minutes=legs[0].duration_minutes,
@@ -650,6 +775,7 @@ class TripSearchService:
             drive_miles=round(drive_miles, 1),
             transfer_count=1 if last_leg.mode == "transit" else 0,
             cost_breakdown=breakdown,
+            emissions_kg=self._pnr_co2(legs[0], legs[2], last_leg, ctx),
             parking=RouteParking(
                 facility=ParkingFacility(
                     parking_id=lot.lot_id,
@@ -684,7 +810,7 @@ class TripSearchService:
         leave: datetime,
         at_lot: datetime,
         morning_parking: MoneyEstimate,
-        payment: str,
+        ctx: _Context,
     ) -> _Evening | None:
         """Walk or subway to the hub, next train out, walk to the car, drive home."""
         city_leg, subway_fare = self._last_mile(hub, destination, leave, toward_hub=True)
@@ -695,8 +821,10 @@ class TripSearchService:
         if trip is None:
             return None
         at_car = trip.arrival + timedelta(minutes=self._region.default_parking_buffer_minutes)
-        drive = self._driving.route(station.point, origin)
+        chosen = self._drive(station.point, origin, at_car, ctx)
+        drive, tolls, unknown_tolls = chosen.route, chosen.tolls, chosen.unknown_tolls
         home = at_car + timedelta(seconds=drive.duration_s)
+        rail_line = self._transit.trip_polyline(trip)
         legs = [
             city_leg,
             RouteLeg(
@@ -707,10 +835,11 @@ class TripSearchService:
                 start_time=trip.departure,
                 end_time=trip.arrival,
                 duration_minutes=_minutes(trip.arrival - trip.departure),
+                distance_miles=_polyline_miles(rail_line),
                 agency=trip.agency,
                 route_name=trip.route_name,
                 headsign=trip.headsign,
-                polyline=self._transit.trip_polyline(trip),
+                polyline=rail_line,
                 time_provenance=Provenance.SCHEDULED,
             ),
             RouteLeg(
@@ -734,13 +863,13 @@ class TripSearchService:
                 distance_miles=round(drive.distance_m / costs.METERS_PER_MILE, 1),
                 polyline=drive.polyline,
                 time_provenance=Provenance.ESTIMATED,
+                map_links=self._map_links(station.point, origin),
             ),
         ]
-        tolls, _, unknown_tolls = self._tolls(drive, at_car, payment)
         rail = self._rail_fare(lot.station)
         rail = rail.model_copy(update={"note": f"{rail.note}, same fare in reverse"})
         evening = _breakdown(
-            costs.fuel_cost(drive.distance_m, self._vehicle()),
+            costs.fuel_cost(drive.distance_m, ctx.fuel),
             self._parking_for_stay(lot, at_lot, at_car, morning_parking),
             self._fares(rail, subway_fare),
             tolls,
@@ -753,8 +882,27 @@ class TripSearchService:
             ),
             legs=legs,
             costs=evening,
-            warnings=self._home_warnings(evening, unknown_tolls),
+            warnings=self._home_warnings(evening, unknown_tolls)
+            + ([f"Trip home: {chosen.note}"] if chosen.note else []),
         )
+
+    def _pnr_co2(
+        self, drive: RouteLeg, rail: RouteLeg, last: RouteLeg, ctx: _Context
+    ) -> MoneyEstimate:
+        """Drive to the lot, train to the hub, and the subway when the last mile takes it."""
+        factors = self._emission_factors()
+        parts = [
+            costs.car_co2(drive.distance_miles or 0.0, ctx.fuel, factors),
+            costs.transit_co2(
+                rail.distance_miles, self._modes(self._corridor.transit_feed), "Train", factors
+            ),
+        ]
+        if last.mode == "transit":
+            feed = self._pricing.flat_fares[0].feed_id
+            parts.append(
+                costs.transit_co2(last.distance_miles, self._modes(feed), "Subway", factors)
+            )
+        return costs.co2_total(parts)
 
     @staticmethod
     def _parking_for_stay(
@@ -877,28 +1025,78 @@ class TripSearchService:
     # -- ranking and explanation ------------------------------------------------------
 
     @staticmethod
-    def _rank_keys(options: list[_Option]) -> dict[str, Callable[[_Option], tuple[float, ...]]]:
-        """Sort keys per mode. An option with an unknown cost has only a partial total — a lower
-        bound — so for cost-based modes it ranks after every option whose total is complete;
-        a partial total can never win on price (N-02). Time is always known, so "fastest" is
-        unaffected, and so is "least_driving" (minutes behind the wheel)."""
+    def _filter(
+        options: list[_Option], prefs: Preferences
+    ) -> tuple[list[_Option], list[FilteredRoute]]:
+        """Apply avoid_tolls and max_walk_minutes (F-07). A hidden option is listed with every
+        reason it failed, never silently dropped."""
+        kept: list[_Option] = []
+        hidden: list[FilteredRoute] = []
+        for o in options:
+            reasons = TripSearchService._filter_reasons(o.route, prefs)
+            if reasons:
+                hidden.append(
+                    FilteredRoute(
+                        route_id=o.route.route_id, summary=o.route.summary, reasons=reasons
+                    )
+                )
+            else:
+                kept.append(o)
+        return kept, hidden
+
+    @staticmethod
+    def _filter_reasons(r: RouteOption, prefs: Preferences) -> list[str]:
+        reasons: list[str] = []
+        if prefs.avoid_tolls:
+            trips = [("", r.cost_breakdown)]
+            if r.round_trip:
+                trips.append(("Trip home: ", r.round_trip.return_cost_breakdown))
+            for prefix, c in trips:
+                for what, est in (("tolls", c.tolls), ("the congestion toll", c.congestion_fee)):
+                    if est.amount is None:
+                        reasons.append(f"{prefix}may pay {what}, not priced ({est.note})")
+                    elif est.amount > 0:
+                        reasons.append(f"{prefix}pays {_money(est)} in {what} ({est.note})")
+        limit = prefs.max_walk_minutes
+        if limit is not None and r.walk_minutes > limit:
+            reasons.append(
+                f"Walks {r.walk_minutes:.0f} min on the morning trip; your limit is {limit} min"
+            )
+        return [reason[0].upper() + reason[1:] for reason in reasons]
+
+    @staticmethod
+    def _score(options: list[_Option]) -> Callable[[_Option], float]:
+        """Best overall: equal weight to money and time, each relative to the best option (cost
+        against complete totals only — a partial total is a lower bound, N-02)."""
         complete = [o for o in options if o.complete_cost] or options
         min_cost = min((o.known_cost for o in complete), default=0) or 1.0
         min_time = min((o.route.total_minutes for o in options), default=0) or 1.0
+        return lambda o: o.known_cost / min_cost + o.route.total_minutes / min_time
 
-        def score(o: _Option) -> float:
-            # Equal weight to money and time, each relative to the best available option.
-            return o.known_cost / min_cost + o.route.total_minutes / min_time
+    @classmethod
+    def _rank_keys(
+        cls, options: list[_Option]
+    ) -> dict[str, Callable[[_Option], tuple[float, ...]]]:
+        """Sort keys per mode (F-06). An option with an unknown cost has only a partial total, so
+        for cost-based modes it ranks after every option whose total is complete; likewise an
+        unknown CO2 ranks last for "cleanest". Time, drive minutes and transfers are always known.
+        Ties on a mode's own metric fall back to door-to-door time."""
+        score = cls._score(options)
 
         def partial(o: _Option) -> float:
             return 0.0 if o.complete_cost else 1.0
+
+        def no_co2(o: _Option) -> float:
+            return 1.0 if o.co2 is None else 0.0
 
         return {
             "fastest": lambda o: (o.route.total_minutes, o.known_cost),
             "cheapest": lambda o: (partial(o), o.known_cost, o.route.total_minutes),
             "best_overall": lambda o: (partial(o), score(o), o.route.total_minutes),
-            # Minutes behind the wheel (drive times are always known), then door-to-door time.
             "least_driving": lambda o: (o.route.drive_minutes, o.route.total_minutes),
+            "most_driving": lambda o: (-o.route.drive_minutes, o.route.total_minutes),
+            "fewest_transfers": lambda o: (o.route.transfer_count, o.route.total_minutes),
+            "cleanest": lambda o: (no_co2(o), o.co2 or 0.0, o.route.total_minutes),
         }
 
     @classmethod
@@ -908,26 +1106,55 @@ class TripSearchService:
         keys = cls._rank_keys(options)
         return sorted(options, key=keys.get(sort_mode, keys["best_overall"]))
 
+    @staticmethod
+    def _unique_winner(pool: list[_Option], metric: Callable[[_Option], float]) -> _Option | None:
+        """The one option with the lowest metric, or None when two or more share it (no badge
+        on a tie). Metrics are compared at the precision the page shows."""
+        if not pool:
+            return None
+        values = [metric(o) for o in pool]
+        best = min(values)
+        winners = [o for o, v in zip(pool, values, strict=True) if v == best]
+        return winners[0] if len(winners) == 1 else None
+
     @classmethod
-    def _label_and_explain(cls, ranked: list[_Option]) -> None:
+    def _badge_winners(cls, options: list[_Option]) -> dict[BadgeId, _Option]:
+        """Who earns each badge. Whole minutes, cents and tenths of a kg are the tie precision;
+        cost badges consider complete totals only, "cleanest" known CO2 only."""
+        if len(options) < 2:
+            return {}  # a badge means "beats the others"; a lone option beats nobody
+        score = cls._score(options)
+        complete = [o for o in options if o.complete_cost]
+        known_co2 = [o for o in options if o.co2 is not None]
+        pools: dict[BadgeId, tuple[list[_Option], Callable[[_Option], float]]] = {
+            "best_overall": (complete or options, lambda o: round(score(o), 3)),
+            "fastest": (options, lambda o: round(o.route.total_minutes)),
+            "cheapest": (complete, lambda o: round(o.known_cost, 2)),
+            "least_driving": (options, lambda o: round(o.route.drive_minutes)),
+            "fewest_transfers": (options, lambda o: o.route.transfer_count),
+            "cleanest": (known_co2, lambda o: round(o.co2 or 0.0, 1)),
+        }
+        winners: dict[BadgeId, _Option] = {}
+        for badge, (pool, metric) in pools.items():
+            winner = cls._unique_winner(pool, metric)
+            if winner is not None:
+                winners[badge] = winner
+        return winners
+
+    @classmethod
+    def _badge_and_explain(cls, ranked: list[_Option]) -> None:
         if not ranked:
             return
-        keys = cls._rank_keys(ranked)
-        best = min(ranked, key=keys["best_overall"])
-        fastest = min(ranked, key=keys["fastest"])
-        badges: dict[str, list[str]] = {o.route.route_id: [] for o in ranked}
-        badges[best.route.route_id].append("Best overall")
-        badges[fastest.route.route_id].append("Fastest")
-        least_driving = min(ranked, key=keys["least_driving"])
-        badges[least_driving.route.route_id].append("Least driving")
-        complete = [o for o in ranked if o.complete_cost]
-        if complete:  # no "Cheapest" claim at all when every total is partial
-            cheapest = min(complete, key=keys["cheapest"])
-            badges[cheapest.route.route_id].append("Cheapest")
+        winners = cls._badge_winners(ranked)
+        for o in ranked:
+            o.route.badges = [
+                Badge(id=badge, text=BADGE_TEXT[badge])
+                for badge, winner in winners.items()
+                if winner is o
+            ]
         drive = next((o for o in ranked if o.route.route_id == "drive"), None)
         for o in ranked:
             r = o.route
-            r.label = " · ".join(badges[r.route_id]) or None
             if drive is None or o is drive:
                 text = f"{r.total_minutes:.0f} min door to door for ${o.known_cost:.2f}."
                 daily = _total(r.round_trip.daily_cost_breakdown) if r.round_trip else None
@@ -976,4 +1203,8 @@ class TripSearchService:
             "toll are charged once a day. Monthly and annual figures assume "
             f"{self._corridor.commute.working_days_per_year} working days a year (estimated) and "
             "do not include monthly garage or lot permits.",
+            "CO2 is tailpipe only (EPA factors in the data files): gasoline burned on the drive, "
+            "plus national-average rail factors per passenger-mile. Estimates, not measurements.",
+            "Google Maps / Apple Maps links hand the drive to that app; its route can differ "
+            "from ours.",
         ]

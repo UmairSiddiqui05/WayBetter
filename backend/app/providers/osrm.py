@@ -21,6 +21,7 @@ log = structlog.get_logger(__name__)
 
 PUBLIC_DEMO_SERVER = "https://router.project-osrm.org"
 TIMEOUT_SECONDS = 10.0
+MAX_ALTERNATIVES = 3
 
 
 class OsrmDrivingProvider:
@@ -35,14 +36,29 @@ class OsrmDrivingProvider:
         self._client = client or httpx.Client(timeout=TIMEOUT_SECONDS)
 
     def route(self, origin: LatLon, destination: LatLon) -> DriveRoute:
+        return self._routes(origin, destination, alternatives=False)[0]
+
+    def route_options(self, origin: LatLon, destination: LatLon) -> tuple[DriveRoute, ...]:
+        # The public server rejects exclude=toll ("Exclude flag combination is not supported"),
+        # so avoiding tolls means pricing the alternatives it returns (D-21).
+        return self._routes(origin, destination, alternatives=True)
+
+    def _routes(
+        self, origin: LatLon, destination: LatLon, alternatives: bool
+    ) -> tuple[DriveRoute, ...]:
         # OSRM takes lon,lat. Rounding to ~1 m keeps cache keys stable across tiny float noise.
         coords = f"{origin.lon:.5f},{origin.lat:.5f};{destination.lon:.5f},{destination.lat:.5f}"
         query = "overview=full&geometries=polyline&steps=true"
+        if alternatives:
+            query += f"&alternatives={MAX_ALTERNATIVES}"
         url = f"{self._base_url}/route/v1/driving/{coords}?{query}"
         payload = self._fetch(url)
         if payload.get("code") != "Ok" or not payload.get("routes"):
             raise ProviderError(f"OSRM returned no route ({payload.get('code')})")
-        best = payload["routes"][0]
+        return tuple(self._parse(found) for found in payload["routes"])
+
+    @staticmethod
+    def _parse(found: dict[str, Any]) -> DriveRoute:
         steps = tuple(
             DriveStep(
                 name=step.get("name") or "",
@@ -52,12 +68,12 @@ class OsrmDrivingProvider:
                 location=LatLon(step["maneuver"]["location"][1], step["maneuver"]["location"][0]),
                 distance_m=float(step["distance"]),
             )
-            for step in best["legs"][0]["steps"]
+            for step in found["legs"][0]["steps"]
         )
         return DriveRoute(
-            duration_s=float(best["duration"]),
-            distance_m=float(best["distance"]),
-            polyline=best["geometry"],
+            duration_s=float(found["duration"]),
+            distance_m=float(found["distance"]),
+            polyline=found["geometry"],
             steps=steps,
         )
 

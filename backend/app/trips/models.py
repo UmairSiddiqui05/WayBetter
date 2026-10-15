@@ -32,10 +32,29 @@ class LatLng(_Request):
 
 class VehicleProfile(_Request):
     toll_payment: Literal["ezpass", "cash"] = "ezpass"
+    mpg: float | None = Field(default=None, gt=0, le=150)
+    """The user's own fuel economy; None = the data-file average. Shown as user_reported."""
+    fuel_price_per_gallon: float | None = Field(default=None, gt=0, le=20)
+    """The user's own gas price; None = the data-file regional average."""
+
+
+SortMode = Literal[
+    "best_overall",
+    "fastest",
+    "cheapest",
+    "least_driving",
+    "most_driving",
+    "fewest_transfers",
+    "cleanest",
+]
 
 
 class Preferences(_Request):
-    sort_mode: Literal["best_overall", "fastest", "cheapest", "least_driving"] = "best_overall"
+    sort_mode: SortMode = "best_overall"
+    avoid_tolls: bool = False
+    """Hide options whose driving pays a toll (each listed in filtered_out with why)."""
+    max_walk_minutes: int | None = Field(default=None, ge=0, le=120)
+    """Hide options that walk longer than this on the morning trip."""
 
 
 class TripSearchRequest(_Request):
@@ -66,6 +85,14 @@ class CostBreakdown(BaseModel):
     """Sum of the known components. Unknown components are named in the route warnings."""
 
 
+class MapLink(BaseModel):
+    """Hand the drive to a map app (F-17). The URL comes from a region config template."""
+
+    app_id: str
+    label: str
+    url: str
+
+
 class RouteLeg(BaseModel):
     leg_id: str
     mode: Literal["car", "transit", "walk"]
@@ -80,6 +107,8 @@ class RouteLeg(BaseModel):
     headsign: str | None = None
     polyline: str | None = None
     time_provenance: Provenance
+    map_links: list[MapLink] = []
+    """Car legs only: open the same drive in Google Maps / Apple Maps."""
 
 
 class ParkingFacility(BaseModel):
@@ -130,9 +159,21 @@ class RoundTrip(BaseModel):
     """None for the drive-all-the-way option itself, or when there is no drive baseline."""
 
 
+BadgeId = Literal[
+    "best_overall", "fastest", "cheapest", "least_driving", "fewest_transfers", "cleanest"
+]
+
+
+class Badge(BaseModel):
+    """A server-awarded tag (N-01). Only a unique winner gets one; a tie gets none."""
+
+    id: BadgeId
+    text: str
+
+
 class RouteOption(BaseModel):
     route_id: str
-    label: str | None
+    badges: list[Badge]
     summary: str
     total_minutes: float
     drive_minutes: float
@@ -142,6 +183,8 @@ class RouteOption(BaseModel):
     drive_miles: float
     transfer_count: int
     cost_breakdown: CostBreakdown
+    emissions_kg: MoneyEstimate
+    """Tailpipe CO2 for the morning trip in kg (amount is kg, not dollars), estimated."""
     parking: RouteParking | None
     warnings: list[str]
     explanation: Explanation
@@ -150,8 +193,17 @@ class RouteOption(BaseModel):
     """None when no trip home could be found (e.g. no train after the return time)."""
 
 
+class FilteredRoute(BaseModel):
+    """An option the request's filters hid, and why — never silently dropped (F-07)."""
+
+    route_id: str
+    summary: str
+    reasons: list[str]
+
+
 class TripSearchResponse(BaseModel):
     request_id: str
     routes: list[RouteOption]
+    filtered_out: list[FilteredRoute] = []
     sort_options: list[str]
     disclaimers: list[str]

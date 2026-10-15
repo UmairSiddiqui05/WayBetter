@@ -8,11 +8,15 @@
 # RouteOption.round_trip (RoundTrip, Savings). Additive; v0.1 clients ignore them.
 # v0.7.0 (2026-10-14): /trip/ai-parse response gains `choices` (answers to the clarifying
 # question, each a place text for origin or destination). Additive.
+# v0.8.0 (2026-10-15, D-21): BREAKING — RouteOption.label (one string) is replaced by
+# RouteOption.badges [{id, text}]. Additive: sort_mode `cleanest`; RouteOption.emissions_kg is
+# now required and documented; RouteLeg.map_links; TripSearchResponse.filtered_out; bounds on
+# VehicleProfile.mpg / fuel_price_per_gallon and Preferences.max_walk_minutes.
 
 openapi: 3.1.0
 info:
   title: WayBetter API
-  version: 0.7.0
+  version: 0.8.0
   description: >
     Park-and-ride decision engine. All routing, scoring, labeling, and explanation
     logic is server-side; clients render these payloads without recomputation.
@@ -291,9 +295,19 @@ components:
       type: object
       properties:
         type: { type: string, enum: [compact, sedan, suv, hybrid, ev, custom] }
-        mpg: { type: [number, "null"] }
+        mpg:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+          maximum: 150
+          description: >
+            The user's own fuel economy. Null = the region's data-file average. A sent value is
+            echoed in cost notes as "your value" with provenance user_reported (N-02).
         kwh_per_mile: { type: [number, "null"] }
-        fuel_price_per_gallon: { type: [number, "null"] }
+        fuel_price_per_gallon:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+          maximum: 20
+          description: The user's own gas price (USD). Null = the data-file average. user_reported when sent.
         electricity_price_per_kwh: { type: [number, "null"] }
         toll_payment: { type: string, enum: [ezpass, cash], default: ezpass }
 
@@ -323,10 +337,25 @@ components:
           properties:
             sort_mode:
               type: string
-              enum: [best_overall, fastest, cheapest, least_driving, most_driving, fewest_transfers, best_parking]
-            avoid_tolls: { type: boolean, default: false }
+              enum: [best_overall, fastest, cheapest, least_driving, most_driving, fewest_transfers, best_parking, cleanest]
+              description: >
+                Server-side ranking (F-06). v0.8.0 adds `cleanest` (least tailpipe CO2; unknown
+                CO2 ranks last). Cost-based modes rank options with an unknown cost part after
+                complete totals. Ties fall back to door-to-door time.
+            avoid_tolls:
+              type: boolean
+              default: false
+              description: >
+                Hide options whose driving (either trip) pays a road, bridge or tunnel toll or the
+                congestion toll, or may pay one that is not priced. When the driving provider
+                offers alternative routes, one our toll data prices at $0 is used instead.
+                Hidden options are listed in TripSearchResponse.filtered_out (F-07).
             avoid_city_driving: { type: boolean, default: false }
-            max_walk_minutes: { type: [integer, "null"] }
+            max_walk_minutes:
+              type: [integer, "null"]
+              minimum: 0
+              maximum: 120
+              description: Hide options that walk longer than this on the morning trip (listed in filtered_out).
             max_transfers: { type: [integer, "null"] }
             cost_sensitivity: { type: string, enum: [low, medium, high] }
             driving_penalty: { type: string, enum: [low, medium, high] }
@@ -401,9 +430,47 @@ components:
         headsign: { type: [string, "null"] }
         polyline: { type: [string, "null"], description: Encoded polyline for map display }
         time_provenance: { $ref: "#/components/schemas/Provenance" }
+        map_links:
+          type: array
+          description: >
+            v0.8.0. Car legs only (empty otherwise): open the same drive in a map app (F-17).
+            Built from URL templates in the region config; the app's own route can differ.
+          items: { $ref: "#/components/schemas/MapLink" }
         alerts:
           type: array
           items: { $ref: "#/components/schemas/Alert" }
+
+    MapLink:
+      type: object
+      required: [app_id, label, url]
+      properties:
+        app_id: { type: string, description: "e.g. google_maps, apple_maps" }
+        label: { type: string }
+        url: { type: string, format: uri }
+
+    Badge:
+      type: object
+      description: >
+        v0.8.0. A server-awarded tag (N-01). Awarded only to a unique winner among the options
+        returned: a tie on the badge's own metric (whole minutes, cents, tenths of a kg CO2,
+        transfer count) awards no badge, and a lone option gets none. Cost badges consider
+        complete totals only; cleanest considers known CO2 only. most_driving is a sort, never
+        a badge.
+      required: [id, text]
+      properties:
+        id: { type: string, enum: [best_overall, fastest, cheapest, least_driving, fewest_transfers, cleanest] }
+        text: { type: string, description: 'Display text, e.g. "Cheapest"' }
+
+    FilteredRoute:
+      type: object
+      description: v0.8.0. An option the request's filters hid, with every reason (never silently dropped, F-07)
+      required: [route_id, summary, reasons]
+      properties:
+        route_id: { type: string }
+        summary: { type: string }
+        reasons:
+          type: array
+          items: { type: string }
 
     Alert:
       type: object
@@ -416,10 +483,13 @@ components:
 
     RouteOption:
       type: object
-      required: [route_id, summary, total_minutes, cost_breakdown, legs]
+      required: [route_id, badges, summary, total_minutes, cost_breakdown, emissions_kg, legs]
       properties:
         route_id: { type: string }
-        label: { type: [string, "null"], description: 'Server-assigned badge, e.g. "Cheapest" (N-01)' }
+        badges:
+          type: array
+          description: v0.8.0, replaces `label`. Empty when the option wins nothing outright.
+          items: { $ref: "#/components/schemas/Badge" }
         summary: { type: string }
         total_minutes: { type: number }
         drive_minutes: { type: number }
@@ -429,7 +499,12 @@ components:
         drive_miles: { type: number }
         transfer_count: { type: integer }
         cost_breakdown: { $ref: "#/components/schemas/CostBreakdown" }
-        emissions_kg: { $ref: "#/components/schemas/MoneyEstimate" }
+        emissions_kg:
+          allOf: [{ $ref: "#/components/schemas/MoneyEstimate" }]
+          description: >
+            Tailpipe CO2 of the morning trip; `amount` is in kg (not dollars). Gallons burned x
+            EPA kg CO2 per gallon, plus rail passenger-miles x EPA per-passenger-mile factors, all
+            from data files (estimated). Unknown when any leg's distance or factor is unknown.
         parking:
           type: [object, "null"]
           properties:
@@ -494,6 +569,10 @@ components:
         routes:
           type: array
           items: { $ref: "#/components/schemas/RouteOption" }
+        filtered_out:
+          type: array
+          description: v0.8.0. Options hidden by avoid_tolls / max_walk_minutes, each with its reasons
+          items: { $ref: "#/components/schemas/FilteredRoute" }
         sort_options:
           type: array
           items: { type: string }
