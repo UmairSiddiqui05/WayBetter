@@ -74,3 +74,22 @@ class AiParseResponse(BaseModel):
     """Which parser read the text: "rules", or "ollama:<model>" for the local model."""
     parser_note: str | None = None
     """Why the fallback parser was used, when it was."""
+
+
+class PlaceLookupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=200)
+    """A place as typed: a verified place name, a street address, a business in a town."""
+    role: Literal["origin", "destination"]
+
+
+class PlaceLookupResponse(BaseModel):
+    """One typed place, resolved by the same rules as /trip/ai-parse (verified places first,
+    then the address lookup, then an approximate town). `place` is null when not found."""
+
+    place: LatLng | None
+    value_label: str
+    provenance: Provenance
+    note: str | None
+    clarifying_question: str | None

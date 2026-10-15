@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -17,6 +18,7 @@ from app.parsing.models import (
     AiParseResponse,
     InterpretationItem,
     ParsedTrip,
+    PlaceLookupResponse,
     TripSearchDraft,
 )
 from app.parsing.places import PlaceResolver, normalize
@@ -165,6 +167,19 @@ class TripParseService:
                 if changes:
                     parser_note = "Checked the model against your words: " + "; ".join(changes)
         return self.interpret(parsed, now, parser=used, parser_note=parser_note)
+
+    def lookup_place(
+        self, text: str, role: Literal["origin", "destination"]
+    ) -> PlaceLookupResponse:
+        """One typed place (the From/To fields). No parser involved: the words are the place."""
+        res = self._resolver.resolve(text, role)
+        return PlaceLookupResponse(
+            place=res.point,
+            value_label=res.value_label,
+            provenance=res.provenance,
+            note=res.note,
+            clarifying_question=res.question,
+        )
 
     def warm_up(self) -> None:
         """Load the model into memory before the first real request (a cold load is ~5 s)."""

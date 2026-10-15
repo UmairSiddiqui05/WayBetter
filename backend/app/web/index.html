@@ -73,6 +73,9 @@
     background: #fff; border-left: 3px solid var(--signal); font-weight: 600; }
   .u-q.need { border-left-color: var(--bad); }
   .u-parser { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .place-note { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin-top: 2px; }
+  .place-note:empty { display: none; }
+  .place-note .u-q { margin-top: 4px; padding: 6px 8px; font-size: 12px; }
   .route-fields { display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px; gap: 0 8px; align-items: center; }
   .route-rail { display: grid; justify-items: center; align-self: stretch; padding: 18px 0; }
   .route-rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
@@ -81,7 +84,7 @@
   .fields { display: grid; gap: 8px; min-width: 0; }
   .field { display: grid; gap: 2px; min-width: 0; }
   .field > span, .label { font-size: 12px; font-weight: 600; color: var(--muted); }
-  select, input[type=datetime-local], input[type=time] { width: 100%; min-width: 0; padding: 8px 10px;
+  select, input[type=datetime-local], input[type=time], input.place { width: 100%; min-width: 0; padding: 8px 10px;
     border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; }
   .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 10px; }
   .when-row .field { flex: 1 1 230px; }
@@ -282,8 +285,14 @@
         <div class="route-fields">
           <div class="route-rail" aria-hidden="true"><span class="dot"></span><span class="line"></span><span class="dot end"></span></div>
           <div class="fields">
-            <label class="field"><span>From</span><select id="origin"></select></label>
-            <label class="field"><span>To</span><select id="destination"></select></label>
+            <div class="field"><label for="origin"><span class="label">From</span></label>
+              <input class="place" id="origin" list="origin-list" autocomplete="off" spellcheck="false"
+                placeholder="Pick a place or type an address" aria-describedby="origin-note">
+              <datalist id="origin-list"></datalist><div class="place-note" id="origin-note" aria-live="polite"></div></div>
+            <div class="field"><label for="destination"><span class="label">To</span></label>
+              <input class="place" id="destination" list="destination-list" autocomplete="off" spellcheck="false"
+                placeholder="Pick a place or type an address" aria-describedby="destination-note">
+              <datalist id="destination-list"></datalist><div class="place-note" id="destination-note" aria-live="polite"></div></div>
           </div>
           <button class="icon-btn" id="swap" type="button" aria-label="Swap From and To" title="Swap From and To"></button>
         </div>
@@ -415,23 +424,46 @@ $("corridor").textContent = PRESETS.corridor;
 
 const PLACES = [...PRESETS.origins, ...PRESETS.destinations];
 const place = (id) => PLACES.find((p) => p.id === id);
-function fillSelect(sel, list, value) {
-  sel.innerHTML = "";
-  for (const p of list) sel.add(new Option(p.label, p.id));
-  if (value) sel.value = value;
-}
+// From/To are text fields: pick a suggested place, or type any address. A typed place is sent to
+// the server (POST /places/resolve) on Compare; the page never geocodes or guesses (N-01).
 let fromList = [...PRESETS.origins], toList = [...PRESETS.destinations];
-fillSelect($("origin"), fromList); fillSelect($("destination"), toList);
+const chosen = { origin: null, destination: null };  // the place each field's text stands for
+const byLabel = (which, text) => (which === "origin" ? fromList : toList).find((p) => p.label === text)
+  || PLACES.find((p) => p.label === text) || null;
+function fillList(which) {
+  $(`${which}-list`).innerHTML = (which === "origin" ? fromList : toList)
+    .map((p) => `<option value="${esc(p.label)}"></option>`).join("");
+}
+function setPlace(which, p, note = "") {
+  chosen[which] = p; $(which).value = p ? p.label : ""; $(`${which}-note`).innerHTML = note;
+}
+for (const which of ["origin", "destination"]) {
+  const el = $(which);
+  el.addEventListener("input", () => { chosen[which] = byLabel(which, el.value); $(`${which}-note`).innerHTML = ""; });
+  // Focusing a suggested place empties the field so every suggestion shows; leaving it empty puts it back.
+  el.addEventListener("focus", () => {
+    if (chosen[which] && byLabel(which, el.value)) { el.dataset.prev = el.value; el.placeholder = el.value; el.value = ""; }
+  });
+  el.addEventListener("blur", () => {
+    if (!el.value.trim() && el.dataset.prev) { el.value = el.dataset.prev; chosen[which] = byLabel(which, el.value); }
+    delete el.dataset.prev; el.placeholder = "Pick a place or type an address";
+  });
+}
+fillList("origin"); fillList("destination");
+setPlace("origin", fromList[0]); setPlace("destination", toList[0]);
 $("when").value = PRESETS.default_departure;
 $("swap").addEventListener("click", () => {
-  const o = $("origin").value, d = $("destination").value;
+  const o = { p: chosen.origin, t: $("origin").value, n: $("origin-note").innerHTML };
+  const d = { p: chosen.destination, t: $("destination").value, n: $("destination-note").innerHTML };
   [fromList, toList] = [toList, fromList];
-  fillSelect($("origin"), fromList, d); fillSelect($("destination"), toList, o);
+  fillList("origin"); fillList("destination");
+  chosen.origin = d.p; $("origin").value = d.t; $("origin-note").innerHTML = d.n;
+  chosen.destination = o.p; $("destination").value = o.t; $("destination-note").innerHTML = o.n;
 });
 // Deep link for presenting: ?from=<preset id>&to=<preset id>&at=YYYY-MM-DDTHH:MM (all optional).
 const PARAMS = new URLSearchParams(location.search);
-if (PRESETS.origins.some((p) => p.id === PARAMS.get("from"))) $("origin").value = PARAMS.get("from");
-if (PRESETS.destinations.some((p) => p.id === PARAMS.get("to"))) $("destination").value = PARAMS.get("to");
+if (PRESETS.origins.some((p) => p.id === PARAMS.get("from"))) setPlace("origin", place(PARAMS.get("from")));
+if (PRESETS.destinations.some((p) => p.id === PARAMS.get("to"))) setPlace("destination", place(PARAMS.get("to")));
 if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(PARAMS.get("at") || "")) $("when").value = PARAMS.get("at");
 
 // ---- Settings (localStorage is a convenience; every access may throw) ----------------------
@@ -821,13 +853,40 @@ async function getSession() {
   session = (await r.json()).session_token;
   return session;
 }
+// A typed From/To: the server resolves it (verified places, then OpenStreetMap, then an
+// approximate town) and the page shows how, under the field. Null when it can't be confirmed.
+async function resolveField(which) {
+  if (chosen[which]) return chosen[which];
+  const text = $(which).value.trim();
+  const note = $(`${which}-note`);
+  if (!text) { note.innerHTML = `<span class="st-unknown">Pick a place or type an address.</span>`; return null; }
+  note.textContent = "Looking it up…";
+  const post = async () => fetch("/api/v1/places/resolve", { method: "POST",
+    headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() },
+    body: JSON.stringify({ text: text.slice(0, 200), role: which }) });
+  let r = await post();
+  if (r.status === 401) { session = null; r = await post(); }
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid place") : `HTTP ${r.status}`);
+  const q = data.clarifying_question
+    ? `<div class="u-q ${data.place ? "" : "need"}">${ic("circle-help", "sm")}<span>${esc(data.clarifying_question)}</span></div>` : "";
+  const how = `${askVal(esc(data.value_label), data.provenance)} ${word(data.provenance)}${data.note ? ` · ${esc(data.note)}` : ""}`;
+  if (!data.place) { note.innerHTML = how + q; return null; }
+  const id = `typed-${which}`;
+  for (const arr of [PLACES, fromList, toList]) { const i = arr.findIndex((x) => x.id === id); if (i >= 0) arr.splice(i, 1); }
+  const entry = { id, label: data.place.label || data.value_label, lat: data.place.lat, lng: data.place.lng };
+  PLACES.push(entry); (which === "origin" ? fromList : toList).unshift(entry); fillList(which);
+  setPlace(which, entry, how + q);
+  return entry;
+}
 let inflight = 0;
 async function search() {
-  const o = place($("origin").value), d = place($("destination").value);
-  if (!o || !d) return;
   const ticket = ++inflight;
   $("go").disabled = true; $("status").className = ""; $("status").textContent = "Comparing…";
   try {
+    const o = await resolveField("origin"), d = await resolveField("destination");
+    if (ticket !== inflight) return;
+    if (!o || !d) throw new Error(`couldn't place ${!o ? "From" : "To"} — see the note under it`);
     const body = {
       origin: { lat: o.lat, lng: o.lng, label: o.label },
       destination: { lat: d.lat, lng: d.lng, label: d.label },
@@ -901,7 +960,8 @@ function draftPlaceId(which, p) {
 }
 function applyDraft(d) {
   const o = draftPlaceId("origin", d.origin), t = draftPlaceId("destination", d.destination);
-  fillSelect($("origin"), fromList, o); fillSelect($("destination"), toList, t);
+  fillList("origin"); fillList("destination");
+  setPlace("origin", place(o)); setPlace("destination", place(t));
   if (d.target_time) $("when").value = d.target_time.slice(0, 16);  // local time as sent, minus seconds/offset
   // For this page view only (not saved): the draft's home time, else the corridor default it reported.
   settings = { home: d.return_time || DEFAULTS.home, toll: d.vehicle_profile.toll_payment === "cash" ? "cash" : "ezpass" };

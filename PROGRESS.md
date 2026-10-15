@@ -160,6 +160,26 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (DEMO SPRINT extension — typed From/To, human-requested):** From and To on
+  the demo page are now text fields (suggested places via a datalist, plus any typed address);
+  the plain-words box stays as the main entry point (a voice button is planned there later).
+  **API v0.4.0**: `POST /places/resolve` (session required; text 1–200 chars + role) resolves one
+  typed place with the same rules as `/trip/ai-parse` — verified places, then the Nominatim lookup
+  (name + town must agree), then an approximate town — returning `place` (null when not found),
+  `value_label`, `provenance`, `note` (incl. ODbL attribution) and `clarifying_question`. The page
+  calls it on Compare only for text that isn't a suggested place, shows how each place was found
+  under its field, and refuses to compare with a field it couldn't place. Focusing a suggested
+  place empties the field so every suggestion shows; leaving it empty restores it. Verified on
+  port 8000: "75 West Main St, Somerville NJ" → "350 5th Ave, Manhattan" (both exact, ODbL shown)
+  compares; "Atlantis" shows not-found + question and no compare; picking Raritan still works;
+  375 px no sideways scroll; no console errors. ruff/mypy/pytest green (228). Files:
+  `backend/app/api/v1/{places,router}.py`, `backend/app/parsing/{models,service}.py`,
+  `backend/app/web/index.html`, `backend/app/__init__.py`, `docs/api-spec.yaml`,
+  `backend/tests/test_place_lookup.py`. Requirements: F-08, F-18, N-01, N-02, N-05.
+  **Note:** the backlog item "Ranking with unknown costs" shows up more often with typed
+  destinations: their parking and congestion toll are unknown, so "Drive all the way" can rank
+  Best overall on a partial total (Somerville → Empire State: $24.74, flagged unknown).
+
 - **2026-10-14 — Claude (DEMO SPRINT extension, plain-words box on the demo page):** Fast-forwarded
   `main` to `demo/nl-parse` (it already contained main's page round 4; the redesign chat was idle with
   its work committed). The `#ask` slot on the page is now a text box ("Or say it in plain words",
