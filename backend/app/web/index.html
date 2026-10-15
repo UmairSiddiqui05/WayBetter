@@ -54,8 +54,25 @@
 
   /* Search */
   .search { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-  #ask:empty { display: none; }  /* slot for the natural-language input another change adds */
+  /* Plain-words request: the server reads the words; the page shows what it understood. */
   #ask { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .ask-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin-top: 2px; }
+  .ask-box textarea { flex: 1 1 240px; min-width: 0; min-height: 60px; padding: 8px 10px; resize: vertical; font: inherit;
+    border: 1px solid #cfd2d6; border-radius: 6px; background: #fff; color: inherit; }
+  .ask-box .primary { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+  .understood { margin-top: 10px; padding: 10px 12px; border-radius: var(--radius); background: var(--soft); }
+  .u-head { font-weight: 750; }
+  .u-list { list-style: none; margin: 6px 0 0; padding: 0; }
+  .u-list li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+  .u-list li:first-child { border-top: 0; }
+  .u-k { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
+  .u-v { font-weight: 650; overflow-wrap: anywhere; }
+  .u-note { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .dflt { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 4px; border: 1px solid #cfd2d6; color: var(--muted); background: #fff; }
+  .u-q { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; padding: 8px 10px; border-radius: 6px;
+    background: #fff; border-left: 3px solid var(--signal); font-weight: 600; }
+  .u-q.need { border-left-color: var(--bad); }
+  .u-parser { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
   .route-fields { display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px; gap: 0 8px; align-items: center; }
   .route-rail { display: grid; justify-items: center; align-self: stretch; padding: 18px 0; }
   .route-rail .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
@@ -253,7 +270,15 @@
   <aside id="panel">
     <section class="view" id="view-plan">
       <form class="search" id="form">
-        <div id="ask"></div>
+        <div id="ask">
+          <label class="field" for="ask-text"><span>Or say it in plain words</span></label>
+          <div class="ask-box">
+            <textarea id="ask-text" rows="2" maxlength="1000"
+              placeholder="Where from, where to, and what matters most: cost, speed, or when you head home…"></textarea>
+            <button class="primary" id="ask-go" type="button"></button>
+          </div>
+          <div id="ask-out" aria-live="polite"></div>
+        </div>
         <div class="route-fields">
           <div class="route-rail" aria-hidden="true"><span class="dot"></span><span class="line"></span><span class="dot end"></span></div>
           <div class="fields">
@@ -395,7 +420,7 @@ function fillSelect(sel, list, value) {
   for (const p of list) sel.add(new Option(p.label, p.id));
   if (value) sel.value = value;
 }
-let fromList = PRESETS.origins, toList = PRESETS.destinations;
+let fromList = [...PRESETS.origins], toList = [...PRESETS.destinations];
 fillSelect($("origin"), fromList); fillSelect($("destination"), toList);
 $("when").value = PRESETS.default_departure;
 $("swap").addEventListener("click", () => {
@@ -591,9 +616,14 @@ function figures(r) {
 const railLeg = (r) => r.legs.find((l) => legKind(l) === "rail");
 const rowTitle = (r) => { const t = railLeg(r); return t && t.start_location.label ? titleCase(t.start_location.label) : r.summary; };
 const rowSub = (r) => railLeg(r) ? r.summary : `${r.drive_miles} mi by car`;
-// One tag per row: the server's first (primary) label.
-const firstTag = (r) => (r.label || "").split(" · ").filter(Boolean)[0];
-const tagHtml = (r) => { const t = firstTag(r); return t ? `<span class="badge ${t === "Best overall" ? "best" : ""}">${esc(t)}</span>` : ""; };
+// One tag per row: the server's label for the active ranking tab when the row has it, else its
+// first (primary) label.
+const firstTag = (r) => {
+  const tags = (r.label || "").split(" · ").filter(Boolean);
+  const active = humanize(sortMode || sortOptions[0] || "");
+  return tags.includes(active) ? active : tags[0];
+};
+const tagHtml = (r) => { const t = firstTag(r); return t ? `<span class="badge ${t === humanize(sortMode || sortOptions[0] || "") ? "best" : ""}">${esc(t)}</span>` : ""; };
 
 const KIND_WORD = { car: "Drive", rail: "Train", subway: "Subway", walk: "Walk", wait: "Wait" };
 const MODE_ICON = { car: "car", rail: "train-front", subway: "tram-front", walk: "footprints" };
@@ -830,6 +860,82 @@ async function search() {
   }
 }
 $("form").addEventListener("submit", (e) => { e.preventDefault(); setPeriod("trip"); search(); });
+
+// ---- Plain words (POST /trip/ai-parse) --------------------------------------------------------
+// The server reads the words, resolves the places and fills a draft request; the page shows its
+// interpretation as sent and, when nothing is missing, copies the draft into the form above.
+$("ask-go").innerHTML = `${ic("sparkles", "sm")}Read it`;
+const ASK_HINT = { ai_generated: "read from your words", estimated: "approximate, or the app's default",
+  unknown: "not found or not supported" };
+const askVal = (text, p) => `<span class="st-${stKey(p)}" title="${esc(provOf(p).word)}: ${esc(ASK_HINT[p] || provOf(p).hint)}">${text}<span class="sr"> (${esc(provOf(p).word)})</span></span>`;
+const ASK_FIELD = { origin: "From", destination: "To", target_time: "When", return_time: "Home",
+  "preferences.sort_mode": "Rank by", "vehicle_profile.toll_payment": "Tolls" };
+// Place notes stay on screen (how the place was found, and its ODbL attribution); the others
+// ("Default: …", "Read from your words") are in the row's tooltip.
+const ASK_PLACE = new Set(["origin", "destination"]);
+const parserText = (p) => p.startsWith("ollama:") ? `Read by a local AI model (${esc(p.slice(7))})` : "Read by the rules parser";
+function understoodHtml(a) {
+  const ready = !a.missing_fields.length;
+  return `<div class="understood">
+    <div class="u-head">${ic("sparkles", "sm")} Here's what I understood</div>
+    <ul class="u-list">${a.interpretation.map((it) => `<li>
+      <span class="u-k">${esc(ASK_FIELD[it.field] || humanize(it.field))}</span>
+      <div title="${esc(ASK_PLACE.has(it.field) ? "" : it.note)}"><span class="u-v">${askVal(esc(it.value_label), it.provenance)}</span> ${word(it.provenance)}
+        ${it.is_default ? `<span class="dflt">default</span>` : ""}
+        ${it.note && ASK_PLACE.has(it.field) ? `<div class="u-note">${esc(it.note)}</div>` : ""}</div></li>`).join("")}</ul>
+    ${a.clarifying_question ? `<div class="u-q ${ready ? "" : "need"}">${ic("circle-help")}<span>${esc(a.clarifying_question)}</span></div>` : ""}
+    ${ready ? "" : `<p class="u-parser">${ic("triangle-alert", "sm")} Needs: ${esc(a.missing_fields.map((f) => ASK_FIELD[f] || humanize(f)).join(", "))}. Answer in the box above, or pick in the form below.</p>`}
+    <p class="u-parser">${parserText(a.parser)}${a.parser_note ? ` · ${esc(a.parser_note)}` : ""}</p>
+  </div>`;
+}
+// Put a draft place into a From/To list: the preset with the same coordinates, else the place as sent.
+function draftPlaceId(which, p) {
+  const list = which === "origin" ? fromList : toList;
+  const known = list.find((x) => x.lat === p.lat && x.lng === p.lng);
+  if (known) return known.id;
+  const id = `ask-${which}`;
+  for (const arr of [PLACES, fromList, toList]) { const i = arr.findIndex((x) => x.id === id); if (i >= 0) arr.splice(i, 1); }
+  const entry = { id, label: p.label, lat: p.lat, lng: p.lng };
+  PLACES.push(entry); list.unshift(entry);
+  return id;
+}
+function applyDraft(d) {
+  const o = draftPlaceId("origin", d.origin), t = draftPlaceId("destination", d.destination);
+  fillSelect($("origin"), fromList, o); fillSelect($("destination"), toList, t);
+  if (d.target_time) $("when").value = d.target_time.slice(0, 16);  // local time as sent, minus seconds/offset
+  // For this page view only (not saved): the draft's home time, else the corridor default it reported.
+  settings = { home: d.return_time || DEFAULTS.home, toll: d.vehicle_profile.toll_payment === "cash" ? "cash" : "ezpass" };
+  renderChips();
+  sortMode = d.preferences.sort_mode || null;
+  setPeriod("trip"); search();
+}
+let askTicket = 0;
+async function ask() {
+  const text = $("ask-text").value.trim();
+  if (!text) { $("ask-text").focus(); return; }
+  const ticket = ++askTicket;
+  $("ask-go").disabled = true;
+  $("ask-out").innerHTML = `<p class="u-parser">Reading your words…</p>`;
+  try {
+    const post = async () => fetch("/api/v1/trip/ai-parse", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": await getSession() }, body: JSON.stringify({ text }) });
+    let r = await post();
+    if (r.status === 401) { session = null; r = await post(); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "invalid request") : `HTTP ${r.status}`);
+    if (ticket !== askTicket) return;
+    $("ask-out").innerHTML = understoodHtml(data);
+    if (!data.missing_fields.length) applyDraft(data.draft);
+  } catch (err) {
+    if (ticket !== askTicket) return;
+    $("ask-out").innerHTML = `<p class="u-parser" style="color:var(--bad)">Could not read that: ${esc(err.message)}</p>`;
+  } finally {
+    if (ticket === askTicket) $("ask-go").disabled = false;
+  }
+}
+$("ask-go").addEventListener("click", ask);
+$("ask-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
+
 search();  // open on a comparison, never a blank page
 </script>
 </body>

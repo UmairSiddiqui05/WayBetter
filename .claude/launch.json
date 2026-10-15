@@ -31,6 +31,20 @@
         ".env"
       ],
       "port": 8001
+    },
+    {
+      "name": "waybetter-api-dev",
+      "runtimeExecutable": "backend/.venv/bin/uvicorn",
+      "runtimeArgs": [
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8020",
+        "--env-file",
+        ".env"
+      ],
+      "port": 8020
     }
   ]
 }

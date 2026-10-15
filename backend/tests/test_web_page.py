@@ -88,5 +88,11 @@ def test_every_icon_the_page_uses_is_in_the_sprite() -> None:
     assert used <= symbols, used - symbols
 
 
-def test_natural_language_slot_is_reserved(page: str) -> None:
-    assert '<div id="ask"></div>' in page
+def test_plain_words_box_posts_to_ai_parse(page: str) -> None:
+    # F-08: the page sends the words to the server and renders its interpretation; the parsing,
+    # place lookup and defaults all happen server-side (N-01).
+    assert 'id="ask-text"' in page
+    assert '"/api/v1/trip/ai-parse"' in page
+    shown = ("interpretation", "missing_fields", "clarifying_question", "parser_note", "is_default")
+    for field in shown:
+        assert field in page, field
