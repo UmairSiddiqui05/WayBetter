@@ -151,10 +151,10 @@ paths:
                     oneOf: [{ $ref: "#/components/schemas/LatLng" }, { type: "null" }]
                   value_label: { type: string }
                   provenance: { $ref: "#/components/schemas/Provenance" }
-                  note: { type: [string, "null"], description: How it was found, incl. OSM attribution }
+                  note: { type: [string, "null"], description: "How it was found, incl. OSM attribution" }
                   clarifying_question: { type: [string, "null"] }
         "401": { description: Missing or invalid session token }
-        "422": { description: Empty text, longer than 200 characters, or bad role }
+        "422": { description: "Empty text, longer than 200 characters, or bad role" }
 
   /stations/search:
     get:
@@ -338,11 +338,11 @@ components:
       type: object
       required: [field, value_label, provenance, is_default]
       properties:
-        field: { type: string, description: Draft field path, e.g. origin or preferences.sort_mode }
+        field: { type: string, description: "Draft field path, e.g. origin or preferences.sort_mode" }
         value_label: { type: string }
         provenance: { $ref: "#/components/schemas/Provenance" }
         is_default: { type: boolean, description: True when the user did not say it (app default) }
-        note: { type: [string, "null"], description: Where the value came from, incl. OSM attribution for geocoded places }
+        note: { type: [string, "null"], description: "Where the value came from, incl. OSM attribution for geocoded places" }
 
     CostBreakdown:
       type: object

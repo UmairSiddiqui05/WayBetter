@@ -160,6 +160,13 @@ The single source of truth for **what is done, what is in progress, and what com
 
 ## Work log (append-only, newest first)
 
+- **2026-10-14 — Claude (CI fix):** CI `docs` job (redocly lint) failed on push `5a64f74`: four
+  `description:` values added in v0.3.0/v0.4.0 sat unquoted inside YAML flow mappings, so their
+  commas split them into stray keys (5 `struct` errors). Quoted them; `redocly lint` passes
+  locally; no contract change (no version bump). Lesson: run
+  `npx @redocly/cli lint docs/api-spec.yaml` before pushing a spec edit — pytest's parity test
+  doesn't catch YAML that parses but violates OpenAPI. Files: `docs/api-spec.yaml`.
+
 - **2026-10-14 — Claude (DEMO SPRINT extension — ranking with unknown costs, human-approved):**
   Resolves the backlog item. An option whose total excludes an unknown cost (parking, congestion
   toll, an unpriced toll) only has a lower bound, so for `cheapest` and `best_overall` it now ranks
