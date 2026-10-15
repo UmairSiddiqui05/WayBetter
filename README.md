@@ -1,46 +1,103 @@
 # WayBetter — Park-and-Ride Trip Planner (NYC Metro)
 
-A multimodal trip-decision engine for commuters: given where you are, where you're going, and when, it compares **driving all the way vs. taking transit vs. driving to a station, parking, and riding in** — across the tradeoffs regular map apps ignore: total cost (gas + parking + fares + tolls + congestion fee), parking confidence, driving exposure, transfers, walking, and reliability.
+Should you drive all the way into Manhattan, or drive to a train station, park, and ride in?
+WayBetter compares both, door to door, on **time and total cost**: gas, tolls, the congestion
+toll, parking, and rail fares. It plans the trip home too, so it can show what each choice costs
+per day, month and year. Every number says where it came from, and when there is no sourced
+number, the app says **unknown** instead of guessing.
 
-> "I don't want to drive into Manhattan. Which station should I drive to, will I get a parking spot, and what does the whole trip actually cost?"
+![WayBetter comparing driving into Times Square against four park-and-ride options](docs/screenshots/compare.jpg)
 
-**Status: planning complete, pre-build.** The implementation plan survived a 6-round adversarial cross-model review (Claude ↔ GPT-5.5) and is approved for build.
+**Status (October 2026): working demo** on one corridor, NJ TRANSIT's Northeast Corridor into
+New York Penn Station, with real timetables and official toll, fare and parking prices. The
+production stack in [PLAN.md](PLAN.md) (OpenTripPlanner, Mapbox, Next.js, iOS) comes next; every
+external service already sits behind an interface, so that swap is an adapter change.
 
-## How it works (one paragraph)
+## What it does
 
-The backend generates ~20 candidate park-and-ride stations along your corridor, prices the drive to each (live-traffic API), routes the transit leg from each (self-hosted OpenTripPlanner over official GTFS schedules), attaches parking data from a hand-verified database, computes true door-to-door cost and time, scores everything against your preferences, and returns a ranked comparison — with plain-English explanations generated *after* the math, never instead of it.
+- **Ranks the options seven ways** (best overall, fastest, cheapest, least / most driving, fewest
+  transfers, cleanest). Ranking happens on the server; a badge goes only to an outright winner.
+- **Prices the real route.** Tolls come from the roads the drive actually uses, in the right
+  direction and at the right time of day (NJ Turnpike peak rates, the Lincoln Tunnel only into
+  New York, the congestion toll once a day).
+- **Plans the whole commute.** The trip home, the daily total, and monthly and yearly figures,
+  using a monthly rail pass when it beats daily tickets.
+- **Shows its sources.** ≈ marks an estimate, plain numbers come from a published schedule or
+  price, and a Data sources view lists every price file with its source URL and retrieval date.
+- **Reads a trip in plain English.** A local AI model (Ollama, `qwen3:8b`) fills a validated form,
+  code checks it against your words, and nothing is searched until you confirm. If the model is
+  down, a rules parser takes over.
+- **Filters that explain themselves.** Avoid tolls and a walking limit hide options, and the page
+  lists each hidden option with the reason.
+- **CO₂ per option** from EPA factors, your own mpg and gas price, and hand-off links to Google
+  Maps or Apple Maps for the drive.
 
-## Launch scope
+<img src="docs/screenshots/detail.jpg" alt="Option detail: savings banner, cost per trip, day, month and year, parking facts, and the morning trip step by step" width="420">
 
-- **Region:** NYC metro — NJ Transit rail + commuter bus, LIRR, Metro-North, NYC Subway, PATH, CT rail. (Local buses, bike/scooter share: fast-follow.)
-- **Clients:** Web app first (Next.js + MapLibre), iOS immediately after (SwiftUI + MapKit), Android later. All clients are thin renderers over one backend API.
-- **Sorting:** Best Overall, Fastest, Cheapest, Least Driving, Most Driving, Fewest Transfers, Best Parking + filters (avoid tolls, avoid city driving, max walk).
-- **AI:** natural-language trip requests ("get me to NYU by 9, no city driving") parsed to structured constraints; route explanations grounded in computed metrics. The LLM never invents routes, prices, or schedules.
+## How it works
 
-## Stack
+```
+Browser (one static page) ──POST /api/v1/trip/search──▶ FastAPI
+                                                       ├─ TripSearchService: filter, rank, badge, explain
+                                                       ├─ cost engine ◀── data/*.yaml (sourced, dated prices)
+                                                       ├─ DrivingProvider ── OSRM, cached (→ Mapbox)
+                                                       ├─ TransitProvider ── NJ TRANSIT GTFS (→ OpenTripPlanner)
+                                                       ├─ GeocodingProvider ── OpenStreetMap Nominatim
+                                                       └─ LLMProvider ── Ollama, rules fallback (→ Gemini)
+```
 
-FastAPI (Python) · PostgreSQL/PostGIS · Redis · OpenTripPlanner 2.x · Mapbox (traffic/geocoding, swappable) · Gemini 2.5 Flash-Lite (swappable via `LLMProvider`) · Docker Compose on a single Hetzner VPS · Next.js web · SwiftUI iOS.
+- **All logic is server-side.** The page only draws the API's display-ready JSON, so a future
+  iPhone app gives the same answers.
+- **Contract first.** [docs/api-spec.yaml](docs/api-spec.yaml) is the API contract (v0.8.0); a test
+  fails the build if the code and the contract disagree.
+- **Regions are data.** Fares, tolls, parking, emissions factors and feeds live in `data/` with
+  their source and retrieval date. No prices or agency names in code.
+- **The AI never routes or prices.** It parses words into a schema; unknown fields are rejected.
 
-Every external dependency sits behind a provider interface (`DrivingProvider`, `TransitProvider`, `GeocodingProvider`, `LLMProvider`) — swapping vendors is a config change plus one adapter. Regions are data, not code: new metro = new config + feeds, zero logic changes.
+## Run it locally
+
+Needs Python 3.12+, and for plain-English input, [Ollama](https://ollama.com) with `qwen3:8b`.
+
+```bash
+make install                 # backend virtualenv + dependencies
+make env                     # creates .env; add your NJ TRANSIT developer-portal login
+make fetch-feeds             # downloads the GTFS timetables
+make warm-cache              # caches the demo driving routes (then it works offline)
+backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000 --env-file .env
+```
+
+Open http://localhost:8000. API docs are at `/api/v1/docs`. [DEMO.md](DEMO.md) has the full demo
+script, expected results and known limitations.
+
+## Quality
+
+- 304 automated tests: cost math, toll direction and time-of-day rules, every sort, filter and
+  badge tie rule, unknown handling, the AI parser's guardrails, and contract parity. `make check`
+  runs ruff, mypy strict and pytest; CI runs lint and tests on every push to main and every pull
+  request.
+- Accessibility: keyboard-operable, screen-reader labels on every number, and an axe-core
+  WCAG 2.1 AA scan of the list, detail and table views with no violations.
+- Verified end to end against the real NJ TRANSIT feed, including a run with all network access
+  blocked.
+
+## Limitations
+
+One corridor and four station lots; drive times are free-flow (no live traffic); timetables are
+scheduled, not real-time; lot availability isn't modeled; "arrive by" isn't planned yet. See
+[DEMO.md §5](DEMO.md) for the full list.
 
 ## Documentation map
 
-| File | What it is | Read it if you are… |
-|---|---|---|
-| [README.md](README.md) | This overview | anyone new to the project |
-| [multimodal_park_and_ride_prd.md](multimodal_park_and_ride_prd.md) | Full product vision (long-term) | understanding the *why* and the roadmap |
-| [PLAN.md](PLAN.md) | **Approved implementation plan — authoritative for the launch build**; supersedes the PRD where they conflict (see its amendments section) | deciding *how* anything gets built |
-| [REQUIREMENTS.md](REQUIREMENTS.md) | Numbered launch requirements distilled from PRD + plan | verifying scope or writing tests |
-| [PROGRESS.md](PROGRESS.md) | Live status board + work log — what's done, in progress, next | an AI agent (or human) picking up work |
-| [DECISIONS.md](DECISIONS.md) | Locked decisions with rationale | tempted to relitigate a choice |
-| [PLAN-REVIEW-LOG.md](PLAN-REVIEW-LOG.md) | Full transcript of the adversarial plan review | curious how the plan was hardened |
-| [CLAUDE.md](CLAUDE.md) | Standing instructions for AI coding agents | an AI agent, before touching anything |
-| [docs/agent-tasks.md](docs/agent-tasks.md) | Work orders A1–A10 with definitions of done and dependency order | an agent being dispatched to build something |
-| [docs/api-spec.yaml](docs/api-spec.yaml) | Contract-first OpenAPI spec — **the API contract** until FastAPI generates the authoritative one | building the backend or a client |
-| [docs/verification.md](docs/verification.md) | Golden-trip fixtures (G-01…G-10), edge/failure fixtures (E-01…E-12), human QA script + launch gate | writing tests or verifying results |
-| [.env.example](.env.example) | Template of every environment variable / API key (placeholders only) | setting up a dev environment |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI: lint/type/test for backend and web (skip until code exists), OpenAPI lint + secret guard (active now) | wondering what gates a push |
+| File | What it is |
+|---|---|
+| [PLAN.md](PLAN.md) | Approved implementation plan for the launch build |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Numbered requirements (F-xx / N-xx) cited in commits and tests |
+| [DECISIONS.md](DECISIONS.md) | Locked decisions with rationale |
+| [PROGRESS.md](PROGRESS.md) | Status board and append-only work log |
+| [DEMO.md](DEMO.md) | How to run and present the demo, expected results, limitations |
+| [docs/api-spec.yaml](docs/api-spec.yaml) | The API contract |
+| [multimodal_park_and_ride_prd.md](multimodal_park_and_ride_prd.md) | Long-term product vision |
+| [CLAUDE.md](CLAUDE.md) | Standing rules for the AI agents that build it |
 
-## Project intent
-
-Solo-built portfolio project (AI agents as workforce) targeting a live public web app ≈ Sept 2026 and an iOS App Store release after. Not monetized.
+Solo portfolio project by Umair Siddiqui, built with AI agents doing the implementation under
+human direction and review.
